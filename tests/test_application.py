@@ -1,0 +1,221 @@
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from unittest import mock
+from deployment_migration.application import (
+    DeploymentMigration,
+    VersionControl,
+    FileHandler,
+    GithubActionsAuthor,
+    TerraformModifyer,
+    ParameterStore,
+    ApplicationRuntimeTarget,
+    ApplicationBuildTool,
+)
+
+
+@pytest.fixture
+def version_control() -> VersionControl:
+    return mock.Mock(spec=VersionControl)
+
+
+@pytest.fixture
+def file_handler() -> FileHandler:
+    return mock.Mock(spec=FileHandler)
+
+
+@pytest.fixture
+def github_actions_author() -> GithubActionsAuthor:
+    return mock.Mock(spec=GithubActionsAuthor)
+
+
+@pytest.fixture
+def terraform_modifier() -> TerraformModifyer:
+    return mock.Mock(spec=TerraformModifyer)
+
+
+@pytest.fixture
+def parameter_store() -> ParameterStore:
+    return mock.Mock(spec=ParameterStore)
+
+
+@pytest.fixture
+def application(
+    version_control,
+    file_handler,
+    github_actions_author,
+    terraform_modifier,
+    parameter_store,
+) -> DeploymentMigration:
+    return DeploymentMigration(
+        version_control=version_control,
+        file_handler=file_handler,
+        github_actions_author=github_actions_author,
+        terraform_modifier=terraform_modifier,
+        parameter_store=parameter_store,
+    )
+
+
+@pytest.mark.parametrize(
+    "folder",
+    [
+        Path("terraform/template/"),
+        Path("terraform/modules/template/"),
+        Path("infrastructure/"),
+    ],
+)
+def test_can_find_infrastructure_folder(
+    application: DeploymentMigration, file_handler: FileHandler, folder: Path
+):
+    file_handler.folder_exists.side_effect = lambda x: x == folder
+
+    assert application.find_terraform_infrastructure_folder() == folder
+    assert file_handler.folder_exists.call_count >= 1
+
+
+def test_fails_if_no_infrastructure_folder_is_found(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    file_handler.folder_exists.return_value = False
+
+    with pytest.raises(FileNotFoundError):
+        application.find_terraform_infrastructure_folder()
+
+
+@pytest.mark.parametrize(
+    "folder_base",
+    [
+        Path("terraform/environment/"),
+        Path("environments/"),
+    ],
+)
+@pytest.mark.parametrize(
+    "environment_name", ["service", "test", "staging", "production"]
+)
+def test_can_find_environment_folder(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    folder_base: Path,
+    environment_name: str,
+):
+    folder = folder_base / environment_name
+    file_handler.folder_exists.side_effect = lambda x: x == folder
+
+    assert application.find_terraform_environment_folder(environment_name) == folder
+
+
+def test_fails_if_no_environment_folder_is_found(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    file_handler.folder_exists.return_value = False
+
+    with pytest.raises(FileNotFoundError):
+        application.find_terraform_environment_folder("service")
+
+
+def test_creates_and_writes_github_action_deployment_workflow(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    github_actions_author: GithubActionsAuthor,
+) -> None:
+    created_files = {}
+    file_handler.create_file.side_effect = lambda path, content: created_files.update(
+        {path: content}
+    )
+
+    expected_file = "Never gonna give you up, never gonna let you down"
+    github_actions_author.create_deployment_workflow.return_value = expected_file
+
+    application.create_github_action_deployment_workflow(
+        application_name="test-app",
+        application_build_tool=ApplicationBuildTool.PYTHON,
+        application_runtime_target=ApplicationRuntimeTarget.LAMBDA,
+        terraform_base_folder=Path("terraform"),
+    )
+
+    assert created_files == {Path(".github/workflows/deploy.yml"): expected_file}
+
+
+def test_upgrades_aws_repo_terraform_resources(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: TerraformModifyer,
+) -> None:
+    expected_file = "Never gonna give you up, never gonna let you down"
+    terraform_modifier.add_module.side_effect = (
+        lambda config, *args, **kwargs: config + expected_file
+    )
+
+    terraform_config = "We are no strangers to love\nYou know the rules and so do I\n"
+
+    file_handler.read_file.return_value = terraform_config
+
+    written_file = {}
+    file_handler.overwrite_file.side_effect = lambda path, content: written_file.update(
+        {path: terraform_config + expected_file}
+    )
+
+    application.upgrade_aws_repo_terraform_resources(terraform_folder="terraform")
+
+    file_to_modify = Path("terraform/main.tf")
+    assert written_file == {file_to_modify: terraform_config + expected_file}
+
+
+def test_creates_parameter_store_version_parameter(
+    application: DeploymentMigration,
+    parameter_store: ParameterStore,
+) -> None:
+    app_name = "test-app"
+    temporary_version = "latest"
+
+    application.create_parameter_store_version_parameter(
+        application_name=app_name, temporary_version=temporary_version
+    )
+
+    assert parameter_store.create_parameter.mock_calls[0] == mock.call(
+        f"/__platform__/versions/{app_name}", temporary_version
+    )
+
+
+def test_updates_and_writes_terraform_application_resources(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: TerraformModifyer,
+) -> None:
+    expected_file = "Never gonna give you up, never gonna let you down"
+    terraform_modifier.add_module.side_effect = (
+        lambda config, *args, **kwargs: config + expected_file
+    )
+
+    terraform_config = "We are no strangers to love\nYou know the rules and so do I\n"
+
+    file_handler.read_file.return_value = terraform_config
+
+    written_file = {}
+    file_handler.overwrite_file.side_effect = lambda path, content: written_file.update(
+        {path: terraform_config + expected_file}
+    )
+
+    application.upgrade_terraform_application_resources(
+        terraform_infrastructure_folder="terraform"
+    )
+
+    file_to_modify = Path("terraform/main.tf")
+    assert written_file == {file_to_modify: terraform_config + expected_file}
+
+
+def test_update_terraform_application_resources_updates_module_versions(
+    application: DeploymentMigration,
+    terraform_modifier: TerraformModifyer,
+) -> None:
+    application.upgrade_terraform_application_resources(
+        terraform_infrastructure_folder="infrastructure"
+    )
+
+    call: mock.call = terraform_modifier.mock_calls[0]
+    assert set(call.kwargs["target_modules"].keys()) == {
+        "https://github.com/nsbno/terraform-aws-ecs-service",
+        "https://github.com/nsbno/terraform-aws-lambda",
+    }
