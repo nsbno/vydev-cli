@@ -41,13 +41,6 @@ class VersionControl(abc.ABC):
 
 class TerraformModifyer(abc.ABC):
     @abc.abstractmethod
-    def modify_terraform_file(
-        self: Self,
-        terraform_config: str,
-        replacements: dict,
-    ) -> str:
-        pass
-
     def update_module_versions(
         self: Self,
         terraform_config: str,
@@ -55,6 +48,7 @@ class TerraformModifyer(abc.ABC):
     ) -> str:
         pass
 
+    @abc.abstractmethod
     def add_module(
         self: Self,
         terraform_config: str,
@@ -197,3 +191,15 @@ class DeploymentMigration:
         )
 
         self.file_handler.overwrite_file(terraform_main_file_path, updated_config)
+
+    def find_application_name(self):
+        # TODO
+        raise NotImplementedError()
+
+    def find_build_tool(self):
+        # TODO
+        raise NotImplementedError()
+
+    def find_aws_runtime(self):
+        # TODO
+        raise NotImplementedError()

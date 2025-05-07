@@ -9,7 +9,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "black (>=25.1.0,<26.0.0)",
-    "types-mock (>=5.2.0.20250306,<6.0.0.0)"
+    "types-mock (>=5.2.0.20250306,<6.0.0.0)",
+    "rich (>=14.0.0,<15.0.0)"
 ]
 
 
@@ -19,4 +20,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
-
