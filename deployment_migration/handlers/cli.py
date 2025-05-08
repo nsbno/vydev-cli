@@ -83,30 +83,46 @@ class CLIHandler:
         self.console.print(Panel("[bold]Upgrade AWS Repo[/bold]"))
 
         # Get terraform folder from user
-        terraform_folder = Prompt.ask(
-            "Enter the terraform folder path", default="terraform/environment/prod"
+        try:
+            guessed_terraform_folder = (
+                self.deployment_migration.find_terraform_infrastructure_folder()
+            )
+        except FileNotFoundError:
+            guessed_terraform_folder = None
+        terraform_infrastructure_folder = Prompt.ask(
+            "Enter the terraform template/infrastrcuture folder path",
+            default=(
+                str(guessed_terraform_folder) if guessed_terraform_folder else None
+            ),
+        )
+
+        try:
+            guessed_terraform_service_folder = (
+                self.deployment_migration.find_terraform_environment_folder("service")
+            )
+        except FileNotFoundError:
+            guessed_terraform_service_folder = None
+        terraform_service_folder = Prompt.ask(
+            "Enter the terraform service environment folder path",
+            default=(
+                str(guessed_terraform_service_folder)
+                if guessed_terraform_service_folder
+                else None
+            ),
         )
 
         # Confirm before proceeding
-        if Confirm.ask(
-            f"Are you sure you want to upgrade the AWS repo at {terraform_folder}?"
-        ):
-            try:
-                self.console.print("[yellow]Upgrading AWS repo...[/yellow]")
-                self.deployment_migration.upgrade_aws_repo_terraform_resources(
-                    terraform_folder
-                )
-                self.console.print("[green]AWS repo upgraded successfully![/green]")
+        if not Confirm.ask(f"Upgrade the AWS Repository?"):
+            return
 
-                # TODO: Module URL and version are missing in application.py
-                self.console.print(
-                    "[yellow]Note: The module URL and version are currently empty in the implementation. "
-                    "Please update them in application.py.[/yellow]"
-                )
-            except Exception as e:
-                self.console.print(
-                    f"[bold red]Error upgrading AWS repo: {str(e)}[/bold red]"
-                )
+        self.console.print("[yellow]Upgrading AWS repo...[/yellow]")
+        self.deployment_migration.upgrade_aws_repo_terraform_resources(
+            terraform_infrastructure_folder
+        )
+        self.deployment_migration.upgrade_aws_repo_terraform_resources(
+            terraform_service_folder
+        )
+        self.console.print("[green]AWS repo upgraded successfully![/green]")
 
     def upgrade_application_repo(self) -> None:
         """

@@ -137,6 +137,7 @@ class DeploymentMigration:
     def find_terraform_environment_folder(self: Self, environment: str) -> Path:
         """Finds the folder for a terraform environment"""
         potential_folder_locations = [
+            Path(f"terraform/{environment}/"),
             Path(f"terraform/environment/{environment}/"),
             Path(f"environments/{environment}/"),
         ]
@@ -181,8 +182,8 @@ class DeploymentMigration:
         updated_config = self.terraform.add_module(
             terraform_config,
             name="github_actions_oidc",
-            source="",  # TODO: Module URL
-            version="",  # TODO
+            source="https://github.com/nsbno/terraform-aws-github-oidc",
+            version="0.0.1",
         )
 
         self.file_handler.overwrite_file(file_to_modify, updated_config)
