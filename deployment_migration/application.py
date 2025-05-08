@@ -39,7 +39,7 @@ class VersionControl(abc.ABC):
         pass
 
 
-class TerraformModifyer(abc.ABC):
+class Terraform(abc.ABC):
     @abc.abstractmethod
     def update_module_versions(
         self: Self,
@@ -57,6 +57,10 @@ class TerraformModifyer(abc.ABC):
         version: str,
         variables: Optional[dict[str, Any]] = None,
     ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def has_module(self: Self, module_source: str) -> bool:
         pass
 
 
@@ -77,6 +81,22 @@ class GithubActionsAuthor(abc.ABC):
         pass
 
 
+class ApplicationContext(abc.ABC):
+    @abc.abstractmethod
+    def find_build_tool(self: Self) -> ApplicationBuildTool:
+        """Finds the build tool used for the application"""
+        pass
+
+    @abc.abstractmethod
+    def find_application_artifact_name(self: Self) -> list[str]:
+        """Finds the name of the application"""
+        pass
+
+
+class NotFoundError(Exception):
+    pass
+
+
 @dataclass
 class DeploymentMigration:
     """Migrate from the old to the new deployment pipeline"""
@@ -84,8 +104,9 @@ class DeploymentMigration:
     version_control: VersionControl
     file_handler: FileHandler
     github_actions_author: GithubActionsAuthor
-    terraform_modifier: TerraformModifyer
+    terraform: Terraform
     parameter_store: ParameterStore
+    application_context: ApplicationContext
 
     def _find_folder(self: Self, potential_folders: list[Path]) -> Path | None:
         """Finds a folder in the current working directory"""
@@ -157,7 +178,7 @@ class DeploymentMigration:
 
         terraform_config = self.file_handler.read_file(file_to_modify)
 
-        updated_config = self.terraform_modifier.add_module(
+        updated_config = self.terraform.add_module(
             terraform_config,
             name="github_actions_oidc",
             source="",  # TODO: Module URL
@@ -182,7 +203,7 @@ class DeploymentMigration:
         terraform_main_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
         terraform_config = self.file_handler.read_file(terraform_main_file_path)
 
-        updated_config = self.terraform_modifier.update_module_versions(
+        updated_config = self.terraform.update_module_versions(
             terraform_config,
             target_modules={
                 "https://github.com/nsbno/terraform-aws-ecs-service": "6.0.0-beta1",
@@ -192,14 +213,62 @@ class DeploymentMigration:
 
         self.file_handler.overwrite_file(terraform_main_file_path, updated_config)
 
-    def find_application_name(self):
-        # TODO
-        raise NotImplementedError()
+    def is_repo_in_clean_state(self) -> bool:
+        """Checks if the Git repository is in a clean state
 
-    def find_build_tool(self):
-        # TODO
-        raise NotImplementedError()
+        This means that there are no uncommitted changes.
+        """
+        try:
+            import subprocess
 
-    def find_aws_runtime(self):
-        # TODO
-        raise NotImplementedError()
+            # Run git status --porcelain to check for uncommitted changes
+            # If the output is empty, the repository is in a clean state
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return result.stdout.strip() == ""
+        except subprocess.CalledProcessError as e:
+            # Handle git command errors
+            raise RuntimeError(f"Git operation failed: {e}")
+
+    def find_application_name(self) -> str:
+        names = self.application_context.find_application_artifact_name()
+        if len(names) > 1:
+            raise NotFoundError(
+                "Found more than one application name. That is not implemented yet."
+            )
+        return names[0]
+
+    def find_build_tool(self) -> ApplicationBuildTool:
+        """Figures out which build tool is used for the application"""
+        try:
+            return self.application_context.find_build_tool()
+        except Exception:
+            raise NotFoundError("Could not find a build tool")
+
+    def find_aws_runtime(self) -> ApplicationRuntimeTarget:
+        """Finds the AWS runtime target for the application
+
+        :raises NotFoundError: If the AWS runtime target cannot be found
+        :raises NotImplementedError: If the application uses both ECS and Lambda
+        """
+        has_ecs_module = self.terraform.has_module(
+            "https://github.com/nsbno/terraform-aws-ecs-service"
+        )
+        has_lambda_module = self.terraform.has_module(
+            "https://github.com/nsbno/terraform-aws-lambda"
+        )
+
+        if has_ecs_module and has_lambda_module:
+            raise NotImplementedError(
+                "This tool does not support projects that run both ECS and Lambda. Update manually."
+            )
+        elif has_ecs_module:
+            return ApplicationRuntimeTarget.ECS
+        elif has_lambda_module:
+            return ApplicationRuntimeTarget.LAMBDA
+        else:
+            raise NotFoundError("Could not find an AWS runtime target")

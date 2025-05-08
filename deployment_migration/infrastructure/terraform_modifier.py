@@ -1,11 +1,59 @@
 import re
 from typing import Self, Any, Optional
 
-from deployment_migration.application import TerraformModifyer
+from deployment_migration.application import Terraform
 
 
-class RegexTerraformModifier(TerraformModifyer):
+class RegexTerraformModifier(Terraform):
     """Implementation of TerraformModifyer that uses regex to modify Terraform files."""
+
+    def has_module(self: Self, module_source: str, terraform_config: str = None) -> bool:
+        """
+        Check if a module with the specified source exists in the Terraform configuration.
+
+        :param module_source: The source of the module to check for
+        :param terraform_config: The content of the Terraform file to check. If not provided,
+                                the method will try to find the configuration in the current directory.
+        :return: True if a module with the specified source exists, False otherwise
+        """
+        if terraform_config is None:
+            # If no terraform_config is provided, try to find it in the current directory
+            try:
+                import os
+                from pathlib import Path
+
+                # Look for main.tf in common terraform directories
+                potential_paths = [
+                    Path("terraform/template/main.tf"),
+                    Path("terraform/modules/template/main.tf"),
+                    Path("infrastructure/main.tf"),
+                    Path("main.tf"),
+                ]
+
+                for path in potential_paths:
+                    if os.path.exists(path):
+                        with open(path, "r") as f:
+                            terraform_config = f.read()
+                            break
+
+                if terraform_config is None:
+                    # If we still don't have a config, return False
+                    return False
+            except Exception:
+                # If there's any error reading the file, return False
+                return False
+
+        # Remove any existing ?ref= parameter from the module source
+        base_source = module_source.split("?")[0]
+
+        # Create a pattern to match modules with the specified source
+        module_pattern = f'module\\s+"[^"]+"\\s+{{[^}}]*?source\\s+\\=\\s+"({re.escape(base_source)}(?:\\?ref=[^"]*)?)"[^}}]*?}}'
+
+        # Search for the pattern in the terraform config
+        matches = re.finditer(module_pattern, terraform_config, re.DOTALL)
+
+        # Return True if any matches are found, False otherwise
+        return any(matches)
 
     def update_module_versions(
         self: Self,
@@ -24,7 +72,9 @@ class RegexTerraformModifier(TerraformModifyer):
         for module_source, new_version in target_modules.items():
             # For testing purposes, use a simpler approach
             # Find modules with the specified source and update the source URL with ?ref=version
-            base_source = module_source.split("?")[0]  # Remove any existing ?ref= parameter
+            base_source = module_source.split("?")[
+                0
+            ]  # Remove any existing ?ref= parameter
             module_pattern = f'module\\s+"[^"]+"\\s+{{[^}}]*?source\\s+\\=\\s+"({re.escape(base_source)}(?:\\?ref=[^"]*)?)"[^}}]*?}}'
 
             for module_match in re.finditer(module_pattern, modified_config, re.DOTALL):
@@ -37,9 +87,7 @@ class RegexTerraformModifier(TerraformModifyer):
                 # Find and replace the source attribute with proper whitespace preserved
                 source_pattern = f'(source\\s+\\=\\s+)"{re.escape(current_source)}"'
                 updated_module = re.sub(
-                    source_pattern,
-                    f'\\1"{new_source}"',
-                    module_text
+                    source_pattern, f'\\1"{new_source}"', module_text
                 )
 
                 # Replace the module in the config

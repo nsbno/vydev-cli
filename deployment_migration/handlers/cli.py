@@ -1,6 +1,7 @@
 """Command-line interface for the deployment migration application."""
 
 import sys
+import argparse
 from pathlib import Path
 
 from rich.console import Console
@@ -27,6 +28,12 @@ from deployment_migration.infrastructure.terraform_modifier import (
 from deployment_migration.infrastructure.version_control import (
     GitVersionControl,
 )
+from deployment_migration.infrastructure.stub_handler import (
+    create_stub_deployment_migration,
+)
+from deployment_migration.infrastructure.application_context import (
+    ApplicationContextFinder,
+)
 
 
 class CLIHandler:
@@ -48,6 +55,26 @@ class CLIHandler:
         """
         self.deployment_migration = deployment_migration
         self.console = console or Console()
+
+    def check_repo_clean_state(self) -> bool:
+        """
+        Check if the repository is in a clean state.
+
+        If not, prompt the user to clean the git state before continuing.
+
+        Returns:
+            bool: True if the repository is in a clean state or the user wants to continue anyway,
+                  False if the user wants to abort.
+        """
+        if not self.deployment_migration.is_repo_in_clean_state():
+            self.console.print(
+                "[bold yellow]Warning: The git repository has uncommitted changes.[/bold yellow]"
+            )
+            self.console.print(
+                "It is recommended to commit or stash your existing changes before proceeding."
+            )
+            return Confirm.ask("Do you want to continue anyway?")
+        return True
 
     def upgrade_aws_repo(self) -> None:
         """
@@ -147,54 +174,39 @@ class CLIHandler:
             self.console.print("[bold red]Aborting upgrade[/bold red]")
             return
 
-        try:
-            # Upgrade terraform resources
-            self.console.print(
-                "[yellow]Upgrading application terraform resources...[/yellow]"
-            )
-            self.deployment_migration.upgrade_terraform_application_resources(
-                str(terraform_folder)
-            )
-            self.console.print(
-                "[green]Application terraform resources upgraded successfully![/green]"
-            )
+        # Upgrade terraform resources
+        self.console.print(
+            "[yellow]Upgrading application terraform resources...[/yellow]"
+        )
+        self.deployment_migration.upgrade_terraform_application_resources(
+            str(terraform_folder)
+        )
+        self.console.print(
+            "[green]Application terraform resources upgraded successfully![/green]"
+        )
 
-            # Create GitHub Actions workflow
-            if Confirm.ask(
-                "Do you want to create a GitHub Actions deployment workflow?"
-            ):
-                self.console.print(
-                    "[yellow]Creating GitHub Actions deployment workflow...[/yellow]"
-                )
-                self.deployment_migration.create_github_action_deployment_workflow(
-                    application_name,
-                    build_tool,
-                    runtime_target,
-                    terraform_folder,
-                )
-                self.console.print(
-                    "[green]GitHub Actions workflow created successfully![/green]"
-                )
+        self.console.print(
+            "[yellow]Creating GitHub Actions deployment workflow...[/yellow]"
+        )
+        self.deployment_migration.create_github_action_deployment_workflow(
+            application_name,
+            build_tool,
+            runtime_target,
+            terraform_folder,
+        )
+        self.console.print(
+            "[green]GitHub Actions workflow created successfully![/green]"
+        )
 
-            # Create parameter store version parameter
-            if Confirm.ask(
-                "Do you want to create a parameter store version parameter?"
-            ):
-                self.console.print(
-                    "[yellow]Creating parameter store version parameter...[/yellow]"
-                )
-                temp_version = Prompt.ask("Enter a temporary version", default="latest")
-                self.deployment_migration.create_parameter_store_version_parameter(
-                    application_name, temp_version
-                )
-                self.console.print(
-                    "[green]Parameter store version parameter created successfully![/green]"
-                )
-
-        except Exception as e:
-            self.console.print(
-                f"[bold red]Error upgrading application repo: {str(e)}[/bold red]"
-            )
+        self.console.print(
+            "[yellow]Creating parameter store version parameter...[/yellow]"
+        )
+        self.deployment_migration.create_parameter_store_version_parameter(
+            application_name, "latest"
+        )
+        self.console.print(
+            "[green]Parameter store version parameter created successfully![/green]"
+        )
 
 
 def main():
@@ -205,38 +217,65 @@ def main():
     - 'aws': Upgrade AWS repo
     - 'application': Upgrade application repo
 
+    Optional flags:
+    - '--stub': Use stub implementations for testing
+
     Example usage:
     ./myscript.py aws
     ./myscript.py application
+    ./myscript.py aws --stub
+    ./myscript.py application --stub
     """
     console = Console()
 
-    # Create instances of the required dependencies
-    file_handler = LocalFileHandler()
-    github_actions_author = YAMLGithubActionsAuthor()
-    parameter_store = AWSParameterStore()
-    terraform_modifier = RegexTerraformModifier()
-    version_control = GitVersionControl()
-
-    # Create an instance of DeploymentMigration
-    deployment_migration = DeploymentMigration(
-        version_control=version_control,
-        file_handler=file_handler,
-        github_actions_author=github_actions_author,
-        terraform_modifier=terraform_modifier,
-        parameter_store=parameter_store,
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Deployment Migration CLI")
+    parser.add_argument(
+        "operation",
+        choices=["aws", "application"],
+        help="Operation to perform: 'aws' or 'application'",
+    )
+    parser.add_argument(
+        "--stub", action="store_true", help="Use stub implementations for testing"
     )
 
-    # Create an instance of CLIHandler
-    cli_handler = CLIHandler(deployment_migration, console)
-
-    # Check command-line arguments
+    # Handle the case when no arguments are provided
     if len(sys.argv) < 2:
         console.print("[bold red]Error: Missing argument[/bold red]")
-        console.print(f"Usage: ${sys.argv[0]} [aws|application]")
+        parser.print_help()
         return
 
-    operation = sys.argv[1].lower()
+    try:
+        args = parser.parse_args()
+        operation = args.operation.lower()
+        use_stub = args.stub
+    except SystemExit:
+        # Handle invalid operation
+        console.print(f"[bold red]Error: Invalid argument '{sys.argv[1]}'[/bold red]")
+        parser.print_help()
+        return
+
+    if use_stub:
+        console.print("[yellow]Using stub implementation for testing[/yellow]")
+        deployment_migration = create_stub_deployment_migration()
+    else:
+        # Create instances of the required dependencies
+        file_handler = LocalFileHandler()
+        github_actions_author = YAMLGithubActionsAuthor()
+        parameter_store = AWSParameterStore()
+        terraform_modifier = RegexTerraformModifier()
+        version_control = GitVersionControl()
+        application_context = ApplicationContextFinder()
+
+        # Create an instance of DeploymentMigration
+        deployment_migration = DeploymentMigration(
+            version_control=version_control,
+            file_handler=file_handler,
+            github_actions_author=github_actions_author,
+            terraform=terraform_modifier,
+            parameter_store=parameter_store,
+            application_context=application_context,
+        )
 
     console.print(
         Panel.fit(
@@ -245,6 +284,13 @@ def main():
         )
     )
 
+    # Create an instance of CLIHandler
+    cli_handler = CLIHandler(deployment_migration, console)
+
+    # Check if the repository is in a clean state
+    if not cli_handler.check_repo_clean_state():
+        return
+
     # Run the appropriate operation
     if operation == "aws":
         cli_handler.upgrade_aws_repo()
@@ -252,7 +298,7 @@ def main():
         cli_handler.upgrade_application_repo()
     else:
         console.print(f"[bold red]Error: Invalid argument '{operation}'[/bold red]")
-        console.print(f"Usage: ${sys.argv[0]} [aws|application]")
+        parser.print_help()
 
 
 if __name__ == "__main__":

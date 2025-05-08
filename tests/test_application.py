@@ -9,8 +9,9 @@ from deployment_migration.application import (
     VersionControl,
     FileHandler,
     GithubActionsAuthor,
-    TerraformModifyer,
+    Terraform,
     ParameterStore,
+    ApplicationContext,
     ApplicationRuntimeTarget,
     ApplicationBuildTool,
 )
@@ -32,13 +33,18 @@ def github_actions_author() -> GithubActionsAuthor:
 
 
 @pytest.fixture
-def terraform_modifier() -> TerraformModifyer:
-    return mock.Mock(spec=TerraformModifyer)
+def terraform_modifier() -> Terraform:
+    return mock.Mock(spec=Terraform)
 
 
 @pytest.fixture
 def parameter_store() -> ParameterStore:
     return mock.Mock(spec=ParameterStore)
+
+
+@pytest.fixture
+def application_context() -> ApplicationContext:
+    return mock.Mock(spec=ApplicationContext)
 
 
 @pytest.fixture
@@ -48,13 +54,15 @@ def application(
     github_actions_author,
     terraform_modifier,
     parameter_store,
+    application_context,
 ) -> DeploymentMigration:
     return DeploymentMigration(
         version_control=version_control,
         file_handler=file_handler,
         github_actions_author=github_actions_author,
-        terraform_modifier=terraform_modifier,
+        terraform=terraform_modifier,
         parameter_store=parameter_store,
+        application_context=application_context,
     )
 
 
@@ -141,7 +149,7 @@ def test_creates_and_writes_github_action_deployment_workflow(
 def test_upgrades_aws_repo_terraform_resources(
     application: DeploymentMigration,
     file_handler: FileHandler,
-    terraform_modifier: TerraformModifyer,
+    terraform_modifier: Terraform,
 ) -> None:
     expected_file = "Never gonna give you up, never gonna let you down"
     terraform_modifier.add_module.side_effect = (
@@ -182,7 +190,7 @@ def test_creates_parameter_store_version_parameter(
 def test_updates_and_writes_terraform_application_resources(
     application: DeploymentMigration,
     file_handler: FileHandler,
-    terraform_modifier: TerraformModifyer,
+    terraform_modifier: Terraform,
 ) -> None:
     expected_file = "Never gonna give you up, never gonna let you down"
     terraform_modifier.add_module.side_effect = (
@@ -208,7 +216,7 @@ def test_updates_and_writes_terraform_application_resources(
 
 def test_update_terraform_application_resources_updates_module_versions(
     application: DeploymentMigration,
-    terraform_modifier: TerraformModifyer,
+    terraform_modifier: Terraform,
 ) -> None:
     application.upgrade_terraform_application_resources(
         terraform_infrastructure_folder="infrastructure"

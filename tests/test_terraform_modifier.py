@@ -165,3 +165,57 @@ def test_add_module_without_variables(terraform_modifier: RegexTerraformModifier
     assert f'source = "{source}?ref={version}"' in result
     # Check that there are no variable assignments
     assert "\n  var" not in result
+
+
+def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModifier):
+    """Test that has_module returns True when a module with the specified source exists."""
+    # Arrange
+    terraform_config = """
+    module "example" {
+      source = "https://github.com/example/module"
+    }
+    """
+
+    module_source = "https://github.com/example/module"
+
+    # Act
+    result = terraform_modifier.has_module(module_source, terraform_config)
+
+    # Assert
+    assert result is True
+
+
+def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraformModifier):
+    """Test that has_module returns True when a module with the specified source and a version exists."""
+    # Arrange
+    terraform_config = """
+    module "example" {
+      source = "https://github.com/example/module?ref=1.0.0"
+    }
+    """
+
+    module_source = "https://github.com/example/module"
+
+    # Act
+    result = terraform_modifier.has_module(module_source, terraform_config)
+
+    # Assert
+    assert result is True
+
+
+def test_has_module_returns_false_when_module_not_found(terraform_modifier: RegexTerraformModifier):
+    """Test that has_module returns False when a module with the specified source does not exist."""
+    # Arrange
+    terraform_config = """
+    module "example" {
+      source = "https://github.com/example/other-module"
+    }
+    """
+
+    module_source = "https://github.com/example/module"
+
+    # Act
+    result = terraform_modifier.has_module(module_source, terraform_config)
+
+    # Assert
+    assert result is False
