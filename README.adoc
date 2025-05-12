@@ -1,0 +1,19 @@
+= VyDev CLI
+
+This is a CLI tool for div tasks in Vy Development.
+
+== Usage
+
+Install this CLI tool using `pipx`!
+
+[source,bash]
+----
+pipx install git+https://github.com/nsbno/vydev-cli.git
+----
+
+Then run like any other tool.
+
+[source,bash]
+----
+vydev --help
+----
