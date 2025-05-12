@@ -5,13 +5,13 @@ description = ""
 authors = [
     {name = "Nicolas Harlem Eide",email = "nicolas@harlemeide.net"}
 ]
-readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "black (>=25.1.0,<26.0.0)",
     "types-mock (>=5.2.0.20250306,<6.0.0.0)",
     "rich (>=14.0.0,<15.0.0)",
-    "pyyaml (>=6.0.2,<7.0.0)"
+    "pyyaml (>=6.0.2,<7.0.0)",
+    "boto3 (>=1.38.11,<2.0.0)"
 ]
 
 
@@ -21,3 +21,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+
+[tool.poetry.scripts]
+vydev = "deployment_migration.handlers.cli:main"
