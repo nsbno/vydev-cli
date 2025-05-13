@@ -25,7 +25,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             build_step = {
                 "build": {
                     "uses": self._workflow("build", "gradle", "main"),
-                    "secrets": "inherit"
+                    "secrets": "inherit",
                 }
             }
         else:
@@ -48,13 +48,27 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         if runtime_target == ApplicationRuntimeTarget.ECS:
             package_step = {
                 "package": {
-                    "uses": self._workflow("build", "docker", "main"),
+                    "uses": self._workflow("pacakge", "docker", "main"),
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": {
                         "application_name": application_name,
                         "artifact_name": "${{ needs.build.outputs.artifact_name }}",
                         "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                    },
+                }
+            }
+        elif runtime_target == ApplicationRuntimeTarget.LAMBDA:
+            package_step = {
+                "package": {
+                    "needs": ["build", *(["test"] if add_tests else [])],
+                    "uses": self._workflow("pacakge", "s3", "main"),
+                    "secrets": "inherit",
+                    "with": {
+                        "application_name": application_name,
+                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
+                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                        "directory_to_zip": "${{ needs.build.outputs.artifact_path }}",
                     },
                 }
             }
