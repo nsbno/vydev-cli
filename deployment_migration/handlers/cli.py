@@ -12,6 +12,7 @@ from deployment_migration.application import (
     DeploymentMigration,
     ApplicationBuildTool,
     ApplicationRuntimeTarget,
+    NotFoundError,
 )
 from deployment_migration.infrastructure.file_handler import (
     LocalFileHandler,
@@ -20,7 +21,7 @@ from deployment_migration.infrastructure.github_actions_author import (
     YAMLGithubActionsAuthor,
 )
 from deployment_migration.infrastructure.parameter_store import (
-    AWSParameterStore,
+    AWSAWS,
 )
 from deployment_migration.infrastructure.terraform_modifier import (
     RegexTerraformModifier,
@@ -143,12 +144,11 @@ class CLIHandler:
                 f"[green]Found terraform infrastructure folder: {terraform_folder}[/green]"
             )
 
-            if not Confirm.ask(f"Use the found terraform folder: {terraform_folder}?"):
-                terraform_folder_str = Prompt.ask(
-                    "Enter the terraform infrastructure folder path",
-                    default=str(terraform_folder),
-                )
-                terraform_folder = Path(terraform_folder_str)
+            terraform_folder_str = Prompt.ask(
+                "Enter the terraform infrastructure folder path",
+                default=str(terraform_folder),
+            )
+            terraform_folder = Path(terraform_folder_str)
         except FileNotFoundError:
             terraform_folder_str = Prompt.ask(
                 "Enter the terraform infrastructure folder path",
@@ -164,24 +164,27 @@ class CLIHandler:
             "What is the name of this application?", default=guessed_application_name
         )
 
-        guessed_build_tool = self.deployment_migration.find_build_tool()
+        try:
+            guessed_build_tool = self.deployment_migration.find_build_tool()
+        except NotFoundError:
+            guessed_build_tool = None
         build_tool = Prompt.ask(
             "Select the application build tool",
             choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
             default=guessed_build_tool,
         )
 
-        self.console.print(f"Selected build tool: [green]{build_tool.value}[/green]")
-
-        guessed_target_runtime = self.deployment_migration.find_aws_runtime()
-        runtime_target = Prompt.ask(
-            "Select the application runtime target",
-            choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
-            default=guessed_target_runtime,
-        )
-        self.console.print(
-            f"Selected runtime target: [green]{runtime_target.value}[/green]"
-        )
+        try:
+            guessed_target_runtime = self.deployment_migration.find_aws_runtime()
+        except NotFoundError:
+            guessed_target_runtime = None
+        runtime_target = None
+        while runtime_target is None:
+            runtime_target = Prompt.ask(
+                "Select the application runtime target",
+                choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
+                default=guessed_target_runtime,
+            )
 
         # Confirm before proceeding
         if not Confirm.ask(
@@ -278,7 +281,7 @@ def main():
         # Create instances of the required dependencies
         file_handler = LocalFileHandler()
         github_actions_author = YAMLGithubActionsAuthor()
-        parameter_store = AWSParameterStore()
+        parameter_store = AWSAWS()
         terraform_modifier = RegexTerraformModifier()
         version_control = GitVersionControl()
         application_context = ApplicationContextFinder()
@@ -289,7 +292,7 @@ def main():
             file_handler=file_handler,
             github_actions_author=github_actions_author,
             terraform=terraform_modifier,
-            parameter_store=parameter_store,
+            aws=parameter_store,
             application_context=application_context,
         )
 

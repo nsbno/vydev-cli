@@ -1,7 +1,7 @@
 import pytest
 from unittest import mock
 
-from deployment_migration.infrastructure.parameter_store import AWSParameterStore
+from deployment_migration.infrastructure.parameter_store import AWSAWS
 
 
 # Mock ClientError exception
@@ -24,9 +24,9 @@ def mock_ssm_client():
 
 
 @pytest.fixture
-def parameter_store(mock_ssm_client) -> AWSParameterStore:
+def parameter_store(mock_ssm_client) -> AWSAWS:
     """Create an AWSParameterStore instance with a mocked SSM client."""
-    return AWSParameterStore(mock_ssm_client)
+    return AWSAWS(mock_ssm_client)
 
 
 def test_create_parameter_calls_put_parameter(parameter_store, mock_ssm_client):

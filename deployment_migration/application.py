@@ -63,10 +63,23 @@ class Terraform(abc.ABC):
     def has_module(self: Self, module_source: str) -> bool:
         pass
 
-
-class ParameterStore(abc.ABC):
     @abc.abstractmethod
-    def create_parameter(self: Self, name: str, value: str):
+    def find_account_id(self: Self, folder: str):
+        """Finds the AWS account ID in the terraform folder
+
+        This is used for the environment folders, to figure out which account to use.
+        """
+        pass
+
+
+class AWS(abc.ABC):
+    @abc.abstractmethod
+    def create_parameter(self: Self, name: str, value: str, profile_name: str = ""):
+        pass
+
+    @abc.abstractmethod
+    def find_aws_profile_names(self: Self, account_id: str) -> list[str]:
+        """Finds the AWS profile name(s) for the account ID"""
         pass
 
 
@@ -105,7 +118,7 @@ class DeploymentMigration:
     file_handler: FileHandler
     github_actions_author: GithubActionsAuthor
     terraform: Terraform
-    parameter_store: ParameterStore
+    aws: AWS
     application_context: ApplicationContext
 
     def _find_folder(self: Self, potential_folders: list[Path]) -> Path | None:
@@ -125,6 +138,7 @@ class DeploymentMigration:
             Path("terraform/template/"),
             Path("terraform/modules/template/"),
             Path("infrastructure/"),
+            Path("modules/environment_account_setup"),
         ]
 
         folder = self._find_folder(potential_folder_locations)
@@ -188,13 +202,52 @@ class DeploymentMigration:
 
         self.file_handler.overwrite_file(file_to_modify, updated_config)
 
+    def find_environment_aws_profile_names(self) -> dict[str, str]:
+        runtime_environments = {}
+
+        runtime_environments_to_check = ["stage", "dev", "prod", "test"]
+        for environment in runtime_environments_to_check:
+            try:
+                runtime_environments[environment] = (
+                    self.find_terraform_environment_folder(environment)
+                )
+            except FileNotFoundError:
+                pass
+
+        account_ids = {}
+        for environment, folder in runtime_environments.items():
+            account_ids[environment] = self.terraform.find_account_id(folder)
+
+        profile_names = {}
+        for environment, account_id in account_ids.items():
+            names = self.aws.find_aws_profile_names(account_id)
+            if len(names) == 0:
+                raise NotFoundError(
+                    f"Could not find an AWS profile name for account {account_id}"
+                )
+            elif len(names) == 1:
+                name = names[0]
+            else:
+                name = next(
+                    (name for name in names if "AdministratorAccess" in name), names[0]
+                )
+
+            profile_names[environment] = name
+
+        return profile_names
+
     def create_parameter_store_version_parameter(
-        self: Self, application_name: str, temporary_version: str = "latest"
+        self: Self,
+        application_name: str,
+        temporary_version: str = "latest",
     ) -> None:
         """Creates the parameter store version parameter for the application"""
         parameter_name = f"/__platform__/versions/{application_name}"
 
-        self.parameter_store.create_parameter(parameter_name, temporary_version)
+        account_profiles = self.find_environment_aws_profile_names()
+
+        for environment, profile_name in account_profiles.items():
+            self.aws.create_parameter(parameter_name, temporary_version, profile_name)
 
     def upgrade_terraform_application_resources(
         self: Self,

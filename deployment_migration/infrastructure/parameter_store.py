@@ -1,18 +1,13 @@
 from typing import Self, Optional
-from unittest import mock
+import configparser
+import os.path
 
-from deployment_migration.application import ParameterStore
+from deployment_migration.application import AWS
 
-# Try to import boto3, or create a mock if it's not available
-try:
-    import boto3
-except ImportError:
-    # Create a mock boto3 module for testing
-    boto3 = mock.MagicMock()
-    boto3.client.return_value = mock.MagicMock()
+import boto3
 
 
-class AWSParameterStore(ParameterStore):
+class AWSAWS(AWS):
     """Implementation of ParameterStore that interacts with AWS SSM Parameter Store."""
 
     def __init__(self, client: Optional[boto3.client] = None):
@@ -21,15 +16,22 @@ class AWSParameterStore(ParameterStore):
 
         :param region_name: Optional AWS region name. If not provided, the default region from AWS configuration will be used.
         """
-        self.ssm_client = client or boto3.client("ssm")
+        self.ssm_client = client
 
-    def create_parameter(self: Self, name: str, value: str) -> None:
+    def create_parameter(
+        self: Self, name: str, value: str, profile_name: str = None
+    ) -> None:
         """
         Create a parameter in AWS SSM Parameter Store.
 
         :param name: The name of the parameter
         :param value: The value of the parameter
         """
+        client = self.ssm_client
+        if not client:
+            session = boto3.Session(profile_name=profile_name, region_name="eu-west-1")
+            self.ssm_client = session.client("ssm")
+
         try:
             # Try to put the parameter, overwriting if it already exists
             self.ssm_client.put_parameter(
@@ -38,3 +40,34 @@ class AWSParameterStore(ParameterStore):
         except Exception as e:
             # Handle AWS API errors
             raise RuntimeError(f"Failed to create parameter {name}: {e}")
+
+    def find_aws_profile_names(self: Self, account_id: str) -> list[str]:
+        """
+        Find AWS profile names in config file that contain the specified account ID.
+
+        :param account_id: AWS account ID to search for
+        :return: List of profile names containing the account ID
+        """
+        config = configparser.ConfigParser()
+        config_path = os.path.expanduser("~/.aws/config")
+
+        if not os.path.exists(config_path):
+            return []
+
+        config.read(config_path)
+        matching_profiles = []
+
+        for section in config.sections():
+            if not section.startswith("profile "):
+                continue
+
+            profile_name = section.replace("profile ", "")
+
+            if (account_id not in config[section].get("role_arn", "")) and (
+                account_id not in config[section].get("credential_process", "")
+            ):
+                continue
+
+            matching_profiles.append(profile_name)
+
+        return matching_profiles

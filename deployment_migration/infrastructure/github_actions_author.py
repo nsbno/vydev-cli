@@ -1,5 +1,5 @@
+import yaml
 from typing import Self, Dict, Any
-from unittest import mock
 
 from deployment_migration.application import (
     GithubActionsAuthor,
@@ -7,40 +7,61 @@ from deployment_migration.application import (
     ApplicationRuntimeTarget,
 )
 
-# Try to import yaml, or create a mock if it's not available
-try:
-    import yaml
-except ImportError:
-    # Create a mock yaml module for testing
-    yaml = mock.MagicMock()
-    # Create a simple dump function that returns a YAML-like formatted string
-    def mock_yaml_dump(data, **kwargs):
-        if not isinstance(data, dict):
-            return str(data)
-
-        result = ""
-        for key, value in data.items():
-            if key == "jobs" and isinstance(value, dict):
-                result += f"{key}:\n"
-                for job_name, job_config in value.items():
-                    result += f"  {job_name}:\n"
-                    if isinstance(job_config, dict):
-                        for job_key, job_value in job_config.items():
-                            if job_key == "with" and isinstance(job_value, dict):
-                                result += f"    {job_key}:\n"
-                                for with_key, with_value in job_value.items():
-                                    result += f"      {with_key}: {with_value}\n"
-                            else:
-                                result += f"    {job_key}: {job_value}\n"
-            else:
-                result += f"{key}: {value}\n"
-        return result
-
-    yaml.dump = mock_yaml_dump
-
 
 class YAMLGithubActionsAuthor(GithubActionsAuthor):
     """Implementation of GithubActionsAuthor that generates GitHub Actions workflow YAML files."""
+
+    def _workflow(self, type: str, name: str, version: str) -> str:
+        return f"nsbno/platform-actions/.github/workflows/{type}.{name}.yml@{version}"
+
+    def _build_and_package(
+        self,
+        application_name: str,
+        build_tool: ApplicationBuildTool,
+        runtime_target: ApplicationRuntimeTarget,
+        add_tests: bool = True,
+    ) -> dict[str, Any]:
+        if build_tool == ApplicationBuildTool.GRADLE:
+            build_step = {
+                "build": {
+                    "uses": self._workflow("build", "gradle", "main"),
+                    "secrets": "inherit"
+                }
+            }
+        else:
+            raise NotImplementedError(f"{build_tool} is currently not supported")
+
+        test_step = {}
+        if add_tests:
+            test_step = {
+                "test": {
+                    "needs": ["build"],
+                    "uses": self._workflow("test", "gradle", "main"),
+                    "secrets": "inherit",
+                    "with": {
+                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
+                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                    },
+                }
+            }
+
+        if runtime_target == ApplicationRuntimeTarget.ECS:
+            package_step = {
+                "package": {
+                    "uses": self._workflow("build", "docker", "main"),
+                    "needs": ["build", *(["test"] if add_tests else [])],
+                    "secrets": "inherit",
+                    "with": {
+                        "application_name": application_name,
+                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
+                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                    },
+                }
+            }
+        else:
+            raise NotImplementedError(f"{runtime_target} is currently not supported")
+
+        return {**build_step, **test_step, **package_step}
 
     def create_deployment_workflow(
         self: Self,
@@ -60,26 +81,22 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         """
         jobs = {
             "terraform-changes": {
-                "uses": "./.github/workflows/helpers.find-changes.terraform.yml"
+                "uses": self._workflow("helpers.find-changes", "terraform", "main"),
+                "secrets": "inherit",
             },
-            "build-deployable": {
-                "uses": "./.github/workflows/build.docker.yml",
-                "with": {"application_name": application_name},
-            },
-            "build-lambda": {
-                "uses": "./.github/workflows/build.s3.yml",
-                "with": {"application_name": application_name},
-            },
+            **self._build_and_package(
+                application_name, application_build_tool, application_runtime_target
+            ),
         }
 
         # Add the deploy job with dynamic needs
         jobs["deploy"] = {
             "needs": [name for name in jobs.keys()],
-            "uses": "./.github/workflows/deployment.all-environments.yml",
+            "uses": self._workflow("deployment", "all-environments", "main"),
+            "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure')",
             "with": {
                 "application_name": application_name,
-                "has-application-changes": "true",
                 "terraform-changes": f"${{{{ needs.terraform-changes.outputs.has-changes }}}}",
             },
         }

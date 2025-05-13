@@ -8,7 +8,7 @@ from deployment_migration.application import (
     FileHandler,
     VersionControl,
     Terraform,
-    ParameterStore,
+    AWS,
     GithubActionsAuthor,
     ApplicationBuildTool,
     ApplicationRuntimeTarget,
@@ -72,7 +72,9 @@ class StubTerraformModifier(Terraform):
         """Pretend to add a module."""
         return terraform_config + f"\n\n# Stub: Added module {name}"
 
-    def has_module(self: Self, module_source: str, terraform_config: str = None) -> bool:
+    def has_module(
+        self: Self, module_source: str, terraform_config: str = None
+    ) -> bool:
         """Pretend to check if a module exists."""
         # For testing purposes, return True for specific module sources
         return module_source in [
@@ -81,7 +83,7 @@ class StubTerraformModifier(Terraform):
         ]
 
 
-class StubParameterStore(ParameterStore):
+class StubAWS(AWS):
     """Stub implementation of ParameterStore for testing."""
 
     def create_parameter(self: Self, name: str, value: str):
@@ -165,6 +167,6 @@ def create_stub_deployment_migration() -> DeploymentMigration:
         file_handler=StubFileHandler(),
         github_actions_author=StubGithubActionsAuthor(),
         terraform=StubTerraformModifier(),
-        parameter_store=StubParameterStore(),
+        aws=StubAWS(),
         application_context=StubApplicationContext(),
     )

@@ -1,5 +1,8 @@
 import re
+import os
+import re
 from typing import Self, Any, Optional
+from pathlib import Path
 
 from deployment_migration.application import Terraform
 
@@ -7,7 +10,29 @@ from deployment_migration.application import Terraform
 class RegexTerraformModifier(Terraform):
     """Implementation of TerraformModifyer that uses regex to modify Terraform files."""
 
-    def has_module(self: Self, module_source: str, terraform_config: str = None) -> bool:
+    def find_account_id(self: Self, folder: str) -> str:
+        """
+        Find AWS account ID from backend S3 bucket configuration in Terraform files.
+    
+        :param folder: The folder path containing Terraform files
+        :return: AWS account ID extracted from the bucket name
+        """
+        folder_path = Path(folder)
+        tf_files = folder_path.glob('**/*.tf')
+    
+        for tf_file in tf_files:
+            with open(tf_file, 'r') as f:
+                content = f.read()
+                # Look for backend configuration with S3 bucket
+                bucket_match = re.search(r'bucket\s*=\s*"(\d+)-[^"]*"', content)
+                if bucket_match:
+                    return bucket_match.group(1)
+    
+        raise ValueError(f"Could not find account ID in Terraform files in {folder}")
+
+    def has_module(
+        self: Self, module_source: str, terraform_config: str = None
+    ) -> bool:
         """
         Check if a module with the specified source exists in the Terraform configuration.
 

@@ -10,7 +10,7 @@ from deployment_migration.application import (
     FileHandler,
     GithubActionsAuthor,
     Terraform,
-    ParameterStore,
+    AWS,
     ApplicationContext,
     ApplicationRuntimeTarget,
     ApplicationBuildTool,
@@ -38,8 +38,8 @@ def terraform_modifier() -> Terraform:
 
 
 @pytest.fixture
-def parameter_store() -> ParameterStore:
-    return mock.Mock(spec=ParameterStore)
+def parameter_store() -> AWS:
+    return mock.Mock(spec=AWS)
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def application(
         file_handler=file_handler,
         github_actions_author=github_actions_author,
         terraform=terraform_modifier,
-        parameter_store=parameter_store,
+        aws=parameter_store,
         application_context=application_context,
     )
 
@@ -173,7 +173,7 @@ def test_upgrades_aws_repo_terraform_resources(
 
 def test_creates_parameter_store_version_parameter(
     application: DeploymentMigration,
-    parameter_store: ParameterStore,
+    parameter_store: AWS,
 ) -> None:
     app_name = "test-app"
     temporary_version = "latest"
