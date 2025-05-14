@@ -192,7 +192,8 @@ class DeploymentMigration:
 
         stripped_folders = []
         for folder in folders:
-            if folder.name in ["modules", "infrastructure", "template"]:
+            # TODO: FIX ME
+            if folder.name in ["modules", "infrastructure", "template", "static"]:
                 continue
             stripped_folders.append(folder)
 
