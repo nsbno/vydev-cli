@@ -1,4 +1,5 @@
 import abc
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -35,7 +36,11 @@ class FileHandler(abc.ABC):
 
 class VersionControl(abc.ABC):
     @abc.abstractmethod
-    def commit(self: Self, message: str):
+    def commit(self: Self, message: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_origin(self: Self) -> str:
         pass
 
 
@@ -60,7 +65,7 @@ class Terraform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def has_module(self: Self, module_source: str) -> bool:
+    def has_module(self: Self, module_source: str, infrastructure_folder: Path) -> bool:
         pass
 
     @abc.abstractmethod
@@ -69,6 +74,13 @@ class Terraform(abc.ABC):
 
         This is used for the environment folders, to figure out which account to use.
         """
+        pass
+
+    @abc.abstractmethod
+    def get_parameter(
+        self, type_: str, parameter: str, module_folder: Path
+    ) -> list[str]:
+        """Finds the value of a given datasource in the terraform folder"""
         pass
 
 
@@ -162,6 +174,29 @@ class DeploymentMigration:
             raise FileNotFoundError("Could not find a terraform environment folder")
 
         return folder
+
+    def find_all_environment_folders(self: Self) -> list[Path]:
+        """Finds all terraform environment folders"""
+        potential_folder_locations = [
+            Path("terraform/"),
+            Path("environments/"),
+        ]
+
+        folders = [
+            Path(folder.path)
+            for parent in potential_folder_locations
+            if self.file_handler.folder_exists(parent)
+            for folder in os.scandir(parent)
+            if folder.is_dir()
+        ]
+
+        stripped_folders = []
+        for folder in folders:
+            if folder.name in ["modules", "infrastructure", "template"]:
+                continue
+            stripped_folders.append(folder)
+
+        return stripped_folders
 
     def create_github_action_deployment_workflow(
         self: Self,
@@ -260,8 +295,8 @@ class DeploymentMigration:
         updated_config = self.terraform.update_module_versions(
             terraform_config,
             target_modules={
-                "https://github.com/nsbno/terraform-aws-ecs-service": "6.0.0-beta1",
-                "https://github.com/nsbno/terraform-aws-lambda": "6.0.0-beta1",
+                "github.com/nsbno/terraform-aws-ecs-service": "6.0.0-beta1",
+                "github.com/nsbno/terraform-aws-lambda": "6.0.0-beta1",
             },
         )
 
@@ -288,8 +323,14 @@ class DeploymentMigration:
             # Handle git command errors
             raise RuntimeError(f"Git operation failed: {e}")
 
-    def find_application_name(self) -> str:
-        names = self.application_context.find_application_artifact_name()
+    def find_application_name(self, terraform_folder: Path) -> str:
+        try:
+            names = self.terraform.get_parameter(
+                "aws_ecr_repository", "name", terraform_folder
+            )
+        except NotFoundError:
+            names = self.application_context.find_application_artifact_name()
+
         if len(names) > 1:
             raise NotFoundError(
                 "Found more than one application name. That is not implemented yet."
@@ -303,17 +344,17 @@ class DeploymentMigration:
         except Exception:
             raise NotFoundError("Could not find a build tool")
 
-    def find_aws_runtime(self) -> ApplicationRuntimeTarget:
+    def find_aws_runtime(self, infrastructure_folder: Path) -> ApplicationRuntimeTarget:
         """Finds the AWS runtime target for the application
 
         :raises NotFoundError: If the AWS runtime target cannot be found
         :raises NotImplementedError: If the application uses both ECS and Lambda
         """
         has_ecs_module = self.terraform.has_module(
-            "https://github.com/nsbno/terraform-aws-ecs-service"
+            "github.com/nsbno/terraform-aws-ecs-service", infrastructure_folder
         )
         has_lambda_module = self.terraform.has_module(
-            "https://github.com/nsbno/terraform-aws-lambda"
+            "github.com/nsbno/terraform-aws-lambda", infrastructure_folder
         )
 
         if has_ecs_module and has_lambda_module:
@@ -326,3 +367,27 @@ class DeploymentMigration:
             return ApplicationRuntimeTarget.LAMBDA
         else:
             raise NotFoundError("Could not find an AWS runtime target")
+
+    def help_with_github_environment_setup(
+        self, environment_folders: list[Path]
+    ) -> tuple[str, dict[str, str]]:
+        """Gives help for GitHub environment setup
+
+        Manual at the moment
+
+        :return: Link to the environment setup page and account IDs
+        """
+        account_ids = {}
+
+        for environment_folder in environment_folders:
+            environment_folder_name = environment_folder.name
+            environment_name = environment_folder_name.capitalize()
+
+            account_ids[environment_name] = self.terraform.find_account_id(
+                environment_folder
+            )
+
+        repo_address = self.version_control.get_origin()
+        new_env_url = f"{repo_address}/settings/environments/new"
+
+        return new_env_url, account_ids

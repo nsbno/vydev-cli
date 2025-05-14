@@ -4,7 +4,7 @@ import re
 from typing import Self, Any, Optional
 from pathlib import Path
 
-from deployment_migration.application import Terraform
+from deployment_migration.application import Terraform, NotFoundError
 
 
 class RegexTerraformModifier(Terraform):
@@ -13,72 +13,47 @@ class RegexTerraformModifier(Terraform):
     def find_account_id(self: Self, folder: str) -> str:
         """
         Find AWS account ID from backend S3 bucket configuration in Terraform files.
-    
+
         :param folder: The folder path containing Terraform files
         :return: AWS account ID extracted from the bucket name
         """
         folder_path = Path(folder)
-        tf_files = folder_path.glob('**/*.tf')
-    
+        tf_files = folder_path.glob("**/*.tf")
+
         for tf_file in tf_files:
-            with open(tf_file, 'r') as f:
+            with open(tf_file, "r") as f:
                 content = f.read()
                 # Look for backend configuration with S3 bucket
                 bucket_match = re.search(r'bucket\s*=\s*"(\d+)-[^"]*"', content)
                 if bucket_match:
                     return bucket_match.group(1)
-    
+
         raise ValueError(f"Could not find account ID in Terraform files in {folder}")
 
-    def has_module(
-        self: Self, module_source: str, terraform_config: str = None
-    ) -> bool:
+    def has_module(self: Self, module_source: str, infrastructure_folder: Path) -> bool:
         """
         Check if a module with the specified source exists in the Terraform configuration.
 
         :param module_source: The source of the module to check for
-        :param terraform_config: The content of the Terraform file to check. If not provided,
-                                the method will try to find the configuration in the current directory.
+        :param infrastructure_folder: The folder path containing Terraform files
         :return: True if a module with the specified source exists, False otherwise
         """
-        if terraform_config is None:
-            # If no terraform_config is provided, try to find it in the current directory
-            try:
-                import os
-                from pathlib import Path
-
-                # Look for main.tf in common terraform directories
-                potential_paths = [
-                    Path("terraform/template/main.tf"),
-                    Path("terraform/modules/template/main.tf"),
-                    Path("infrastructure/main.tf"),
-                    Path("main.tf"),
-                ]
-
-                for path in potential_paths:
-                    if os.path.exists(path):
-                        with open(path, "r") as f:
-                            terraform_config = f.read()
-                            break
-
-                if terraform_config is None:
-                    # If we still don't have a config, return False
-                    return False
-            except Exception:
-                # If there's any error reading the file, return False
-                return False
-
         # Remove any existing ?ref= parameter from the module source
         base_source = module_source.split("?")[0]
 
         # Create a pattern to match modules with the specified source
-        module_pattern = f'module\\s+"[^"]+"\\s+{{[^}}]*?source\\s+\\=\\s+"({re.escape(base_source)}(?:\\?ref=[^"]*)?)"[^}}]*?}}'
+        module_pattern = rf'source\s*=\s*"({re.escape(base_source)}(?:\?ref=[^"]*)?)"'
 
-        # Search for the pattern in the terraform config
-        matches = re.finditer(module_pattern, terraform_config, re.DOTALL)
+        # Read all .tf files from the infrastructure folder
+        tf_files = infrastructure_folder.glob("**/*.tf")
+        for tf_file in tf_files:
+            with open(tf_file, "r") as f:
+                content = f.read()
+                # Search for the pattern in the terraform config
+                if re.search(module_pattern, content, re.MULTILINE):
+                    return True
 
-        # Return True if any matches are found, False otherwise
-        return any(matches)
+        return False
 
     def update_module_versions(
         self: Self,
@@ -163,3 +138,33 @@ class RegexTerraformModifier(Terraform):
 
         # Append the new module to the configuration
         return terraform_config + "\n" + module_block
+
+    def get_parameter(
+        self, type_: str, parameter: str, module_folder: Path
+    ) -> list[str]:
+        """
+        Find parameter values in Terraform files based on type and parameter name.
+        Searches in both resource and data source blocks.
+
+        :param type_: The type of resource/data to search for (e.g., 'aws_ssm_parameter')
+        :param parameter: The parameter name to find
+        :param module_folder: The folder path containing Terraform files
+        :return: List of parameter values found
+        """
+        tf_files = module_folder.glob("**/*.tf")
+        values = []
+
+        for tf_file in tf_files:
+            with open(tf_file, "r") as f:
+                content = f.read()
+                # Pattern for both resource and data blocks
+                resource_pattern = f'(?:resource|data)\\s+"{type_}"\\s+"[^"]+"\\s+{{[^}}]*?{parameter}\\s*=\\s*"([^"]*)"[^}}]*}}'
+                matches = re.finditer(resource_pattern, content, re.DOTALL)
+                values.extend(match.group(1) for match in matches)
+
+        if len(values) == 0:
+            raise NotFoundError(
+                f"Could not find parameter {parameter} in {module_folder}"
+            )
+
+        return values

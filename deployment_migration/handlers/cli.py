@@ -159,9 +159,15 @@ class CLIHandler:
         # Get application details
         self.console.print("[yellow]Getting application details...[/yellow]")
 
-        guessed_application_name = self.deployment_migration.find_application_name()
+        try:
+            guessed_application_name = self.deployment_migration.find_application_name(
+                terraform_folder
+            )
+        except NotFoundError:
+            guessed_application_name = None
         application_name = Prompt.ask(
-            "What is the name of this application?", default=guessed_application_name
+            "What is the name of the deployment artifact?",
+            default=guessed_application_name,
         )
 
         try:
@@ -175,7 +181,9 @@ class CLIHandler:
         )
 
         try:
-            guessed_target_runtime = self.deployment_migration.find_aws_runtime()
+            guessed_target_runtime = self.deployment_migration.find_aws_runtime(
+                terraform_folder
+            )
         except NotFoundError:
             guessed_target_runtime = None
         runtime_target = None
@@ -185,6 +193,29 @@ class CLIHandler:
                 choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
                 default=guessed_target_runtime,
             )
+
+        # Guide the user through the environment setup process
+        environment_folders = self.deployment_migration.find_all_environment_folders()
+        new_env_url, accounts = (
+            self.deployment_migration.help_with_github_environment_setup(
+                environment_folders
+            )
+        )
+
+        self.console.print("\n[bold]Please complete the following steps:[/bold]")
+        for env, account in accounts.items():
+            self.console.print(
+                f"Visit {new_env_url} to set up the following environment:"
+            )
+            self.console.print(f"   - [italic]Environment[/italic]: {env}")
+            self.console.print(
+                f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
+            )
+            if not Confirm.ask("\nHave you created this environment in GH?"):
+                self.console.print(
+                    "[bold red]Please complete the environment setup before continuing[/bold red]"
+                )
+                return
 
         # Confirm before proceeding
         if not Confirm.ask(

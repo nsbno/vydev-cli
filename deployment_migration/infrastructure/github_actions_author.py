@@ -28,6 +28,12 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "secrets": "inherit",
                 }
             }
+        elif build_tool == ApplicationBuildTool.PYTHON:
+            build_step = {
+                "build": {
+                    "uses": self._workflow("build", build_tool, "main"),
+                }
+            }
         else:
             raise NotImplementedError(f"{build_tool} is currently not supported")
 
@@ -48,7 +54,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         if runtime_target == ApplicationRuntimeTarget.ECS:
             package_step = {
                 "package": {
-                    "uses": self._workflow("pacakge", "docker", "main"),
+                    "uses": self._workflow("package", "docker", "main"),
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": {
@@ -62,7 +68,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             package_step = {
                 "package": {
                     "needs": ["build", *(["test"] if add_tests else [])],
-                    "uses": self._workflow("pacakge", "s3", "main"),
+                    "uses": self._workflow("package", "s3", "main"),
                     "secrets": "inherit",
                     "with": {
                         "application_name": application_name,

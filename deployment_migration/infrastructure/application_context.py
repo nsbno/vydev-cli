@@ -53,7 +53,9 @@ class ApplicationContextFinder(ApplicationContext):
         # Check for config files
         config_paths = [Path(".deployment/config.yml"), Path(".deployment/config.yaml")]
 
-        config_file = next((path for path in config_paths if os.path.isfile(path)), None)
+        config_file = next(
+            (path for path in config_paths if os.path.isfile(path)), None
+        )
         if not config_file:
             raise FileNotFoundError(
                 "Could not find .deployment/config.yml or config.yaml"
