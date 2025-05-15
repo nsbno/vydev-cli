@@ -16,11 +16,17 @@ class GitVersionControl(VersionControl):
                 capture_output=True,
                 text=True,
             )
+
             origin_url = result.stdout.strip()
-            if origin_url.endswith('.git'):
+
+            if origin_url.endswith(".git"):
                 origin_url = origin_url[:-4]
+
+            if origin_url.startswith("git@github.com:"):
+                origin_url = origin_url.replace("git@github.com:", "github.com/")
+
             return origin_url
-            
+
         except subprocess.CalledProcessError as e:
             raise RuntimeError("Failed to get Git origin URL: " + str(e))
 
