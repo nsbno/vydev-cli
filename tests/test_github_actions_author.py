@@ -22,21 +22,27 @@ except ImportError:
                     "terraform-changes": {
                         "uses": "./.github/workflows/helpers.find-changes.terraform.yml"
                     },
-                    "build-deployable": {
-                        "uses": "./.github/workflows/build.docker.yml",
-                        "with": {"application_name": "test-app"}
+                    "build": {
+                        "uses": "./.github/workflows/build.python.yml"
                     },
-                    "build-lambda": {
-                        "uses": "./.github/workflows/build.s3.yml",
-                        "with": {"application_name": "test-app"}
+                    "package": {
+                        "needs": ["build"],
+                        "uses": "./.github/workflows/package.s3.yml",
+                        "secrets": "inherit",
+                        "with": {
+                            "application_name": "test-app",
+                            "artifact_name": "${{ needs.build.outputs.artifact_name }}",
+                            "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                            "directory_to_zip": "${{ needs.build.outputs.artifact_path }}"
+                        }
                     },
                     "deploy": {
-                        "needs": ["terraform-changes", "build-deployable", "build-lambda"],
+                        "needs": ["terraform-changes", "build", "package"],
                         "uses": "./.github/workflows/deployment.all-environments.yml",
+                        "secrets": "inherit",
                         "if": "!cancelled() && !contains(needs.*.results, 'failure')",
                         "with": {
                             "application_name": "test-app",
-                            "has-application-changes": "true",
                             "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}"
                         }
                     }
@@ -111,16 +117,10 @@ def test_create_deployment_workflow_includes_application_name(github_actions_aut
     # Assert
     # Check that the application name is in the jobs configuration
     assert "jobs" in workflow_dict
-    assert "build-deployable" in workflow_dict["jobs"]
-    assert "with" in workflow_dict["jobs"]["build-deployable"]
-    assert "application_name" in workflow_dict["jobs"]["build-deployable"]["with"]
-    assert workflow_dict["jobs"]["build-deployable"]["with"]["application_name"] == application_name
-
-    # Also check in build-lambda job
-    assert "build-lambda" in workflow_dict["jobs"]
-    assert "with" in workflow_dict["jobs"]["build-lambda"]
-    assert "application_name" in workflow_dict["jobs"]["build-lambda"]["with"]
-    assert workflow_dict["jobs"]["build-lambda"]["with"]["application_name"] == application_name
+    assert "package" in workflow_dict["jobs"]
+    assert "with" in workflow_dict["jobs"]["package"]
+    assert "application_name" in workflow_dict["jobs"]["package"]["with"]
+    assert workflow_dict["jobs"]["package"]["with"]["application_name"] == application_name
 
     # And in deploy job
     assert "deploy" in workflow_dict["jobs"]
@@ -150,7 +150,7 @@ def test_create_deployment_workflow_includes_all_required_jobs(github_actions_au
 
     # Assert
     # Check that all required jobs are present in the workflow
-    required_jobs = ["terraform-changes", "build-deployable", "build-lambda", "deploy"]
+    required_jobs = ["terraform-changes", "build", "package", "deploy"]
     assert "jobs" in workflow_dict
     for job in required_jobs:
         assert job in workflow_dict["jobs"], f"Job '{job}' not found in workflow"

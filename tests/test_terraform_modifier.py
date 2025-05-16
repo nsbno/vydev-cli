@@ -167,7 +167,7 @@ def test_add_module_without_variables(terraform_modifier: RegexTerraformModifier
     assert "\n  var" not in result
 
 
-def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModifier):
+def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModifier, tmp_path):
     """Test that has_module returns True when a module with the specified source exists."""
     # Arrange
     terraform_config = """
@@ -176,16 +176,20 @@ def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModi
     }
     """
 
+    # Create a temporary file with the terraform config
+    tf_file = tmp_path / "main.tf"
+    tf_file.write_text(terraform_config)
+
     module_source = "https://github.com/example/module"
 
     # Act
-    result = terraform_modifier.has_module(module_source, terraform_config)
+    result = terraform_modifier.has_module(module_source, tmp_path)
 
     # Assert
     assert result is True
 
 
-def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraformModifier):
+def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraformModifier, tmp_path):
     """Test that has_module returns True when a module with the specified source and a version exists."""
     # Arrange
     terraform_config = """
@@ -194,16 +198,20 @@ def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraform
     }
     """
 
+    # Create a temporary file with the terraform config
+    tf_file = tmp_path / "main.tf"
+    tf_file.write_text(terraform_config)
+
     module_source = "https://github.com/example/module"
 
     # Act
-    result = terraform_modifier.has_module(module_source, terraform_config)
+    result = terraform_modifier.has_module(module_source, tmp_path)
 
     # Assert
     assert result is True
 
 
-def test_has_module_returns_false_when_module_not_found(terraform_modifier: RegexTerraformModifier):
+def test_has_module_returns_false_when_module_not_found(terraform_modifier: RegexTerraformModifier, tmp_path):
     """Test that has_module returns False when a module with the specified source does not exist."""
     # Arrange
     terraform_config = """
@@ -212,10 +220,14 @@ def test_has_module_returns_false_when_module_not_found(terraform_modifier: Rege
     }
     """
 
+    # Create a temporary file with the terraform config
+    tf_file = tmp_path / "main.tf"
+    tf_file.write_text(terraform_config)
+
     module_source = "https://github.com/example/module"
 
     # Act
-    result = terraform_modifier.has_module(module_source, terraform_config)
+    result = terraform_modifier.has_module(module_source, tmp_path)
 
     # Assert
     assert result is False

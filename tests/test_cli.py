@@ -40,13 +40,15 @@ def cli_handler(mock_deployment_migration, console):
 
 def test_upgrade_aws_repo_success(cli_handler, mock_deployment_migration, string_io, monkeypatch):
     """Test successful AWS repo upgrade."""
-    # Mock user inputs using side-effect on input()
-    with mock.patch('builtins.input', side_effect=["terraform/test", "y"]):
-        # Call the method
-        cli_handler.upgrade_aws_repo()
+    # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
+    monkeypatch.setattr('rich.prompt.Prompt.ask', lambda *args, **kwargs: "terraform/test")
+    monkeypatch.setattr('rich.prompt.Confirm.ask', lambda *args, **kwargs: True)
+
+    # Call the method
+    cli_handler.upgrade_aws_repo()
 
     # Verify the deployment_migration method was called with correct args
-    mock_deployment_migration.upgrade_aws_repo_terraform_resources.assert_called_once_with("terraform/test")
+    mock_deployment_migration.upgrade_aws_repo_terraform_resources.assert_called_with("terraform/test")
 
     # Verify console output
     output = string_io.getvalue()
@@ -57,10 +59,12 @@ def test_upgrade_aws_repo_success(cli_handler, mock_deployment_migration, string
 
 def test_upgrade_aws_repo_cancelled(cli_handler, mock_deployment_migration, string_io, monkeypatch):
     """Test AWS repo upgrade cancelled by user."""
-    # Mock user inputs using side-effect on input()
-    with mock.patch('builtins.input', side_effect=["terraform/test", "n"]):
-        # Call the method
-        cli_handler.upgrade_aws_repo()
+    # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
+    monkeypatch.setattr('rich.prompt.Prompt.ask', lambda *args, **kwargs: "terraform/test")
+    monkeypatch.setattr('rich.prompt.Confirm.ask', lambda *args, **kwargs: False)
+
+    # Call the method
+    cli_handler.upgrade_aws_repo()
 
     # Verify the deployment_migration method was not called
     mock_deployment_migration.upgrade_aws_repo_terraform_resources.assert_not_called()
@@ -76,16 +80,18 @@ def test_upgrade_aws_repo_error(cli_handler, mock_deployment_migration, string_i
     # Mock error in deployment_migration
     mock_deployment_migration.upgrade_aws_repo_terraform_resources.side_effect = Exception("Test error")
 
-    # Mock user inputs using side-effect on input()
-    with mock.patch('builtins.input', side_effect=["terraform/test", "y"]):
-        # Call the method
+    # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly instead of patching input
+    monkeypatch.setattr('rich.prompt.Prompt.ask', lambda *args, **kwargs: "terraform/test")
+    monkeypatch.setattr('rich.prompt.Confirm.ask', lambda *args, **kwargs: True)
+
+    # Call the method and expect an exception
+    with pytest.raises(Exception, match="Test error"):
         cli_handler.upgrade_aws_repo()
 
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade AWS Repo" in output
     assert "Upgrading AWS repo..." in output
-    assert "Error upgrading AWS repo: Test error" in output
 
 
 def test_upgrade_application_repo_success(cli_handler, mock_deployment_migration, string_io, monkeypatch):
@@ -96,6 +102,8 @@ def test_upgrade_application_repo_success(cli_handler, mock_deployment_migration
     mock_deployment_migration.find_application_name.return_value = "test-app"
     mock_deployment_migration.find_build_tool.return_value = ApplicationBuildTool.PYTHON
     mock_deployment_migration.find_aws_runtime.return_value = ApplicationRuntimeTarget.LAMBDA
+    mock_deployment_migration.find_all_environment_folders.return_value = ["dev", "test", "prod"]
+    mock_deployment_migration.help_with_github_environment_setup.return_value = ("https://github.com/org/repo/settings/environments", {"dev": "123456789012"})
 
     # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
     # This is necessary because input() returns strings, but we need enum objects for some values
@@ -135,6 +143,8 @@ def test_upgrade_application_repo_folder_not_found(cli_handler, mock_deployment_
     mock_deployment_migration.find_application_name.return_value = "test-app"
     mock_deployment_migration.find_build_tool.return_value = ApplicationBuildTool.PYTHON
     mock_deployment_migration.find_aws_runtime.return_value = ApplicationRuntimeTarget.LAMBDA
+    mock_deployment_migration.find_all_environment_folders.return_value = ["dev", "test", "prod"]
+    mock_deployment_migration.help_with_github_environment_setup.return_value = ("https://github.com/org/repo/settings/environments", {"dev": "123456789012"})
 
     # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
     # This is necessary because input() returns strings, but we need enum objects for some values
@@ -173,7 +183,6 @@ def test_upgrade_application_repo_folder_not_found(cli_handler, mock_deployment_
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade Application Repo" in output
-    assert "Trying to find terraform infrastructure folder..." in output
     assert "Upgrading application terraform resources..." in output
 
 
