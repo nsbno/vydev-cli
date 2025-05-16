@@ -131,9 +131,33 @@ class CLIHandler:
         """
         self.console.print(Panel("[bold]Upgrade Application Repo[/bold]"))
 
+        # Guide the user through the environment setup process
+        environment_folders = self.deployment_migration.find_all_environment_folders()
+        new_env_url, accounts = (
+            self.deployment_migration.help_with_github_environment_setup(
+                environment_folders
+            )
+        )
+
+        if "Service" not in accounts:
+            # Sometimes, the user might not have a service environment set up in the repo
+            service_account_id = Prompt.ask(
+                "What is the account ID of your service account?"
+            )
+            accounts["service"] = service_account_id
+
+        try:
+            self.deployment_migration.find_environment_aws_profile_names()
+        except NotFoundError as e:
+            self.console.print(
+                f"[bold red]Error: {e}[/bold red]\n"
+                f"Please make sure you have set up AWS CLI profiles for all AWS environments.\n"
+            )
+            return
+
         # Try to find terraform infrastructure folder automatically
         try:
-            terraform_folder = (
+            terraform_folder = str(
                 self.deployment_migration.find_terraform_infrastructure_folder()
             )
         except FileNotFoundError:
@@ -179,21 +203,6 @@ class CLIHandler:
                 choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
                 default=guessed_target_runtime,
             )
-
-        # Guide the user through the environment setup process
-        environment_folders = self.deployment_migration.find_all_environment_folders()
-        new_env_url, accounts = (
-            self.deployment_migration.help_with_github_environment_setup(
-                environment_folders
-            )
-        )
-
-        if "service" not in accounts:
-            # Sometimes, the user might not have a service environment set up in the repo
-            service_account_id = Prompt.ask(
-                "What is the account ID of your service account?"
-            )
-            accounts["service"] = service_account_id
 
         self.console.print("\n[bold]Please complete the following steps:[/bold]")
         for env, account in accounts.items():
