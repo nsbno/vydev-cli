@@ -19,6 +19,9 @@ from deployment_migration.application import (
 class StubFileHandler(FileHandler):
     """Stub implementation of FileHandler for testing."""
 
+    def get_subfolders(self: Self, path: Path) -> list[Path]:
+        return ["prod", "test", "template", "modules", "dev", "stage", "static"]
+
     def create_file(self: Self, path: Path, content: str) -> None:
         """Pretend to create a file."""
         return

@@ -178,12 +178,14 @@ def test_creates_parameter_store_version_parameter(
     app_name = "test-app"
     temporary_version = "latest"
 
+    parameter_store.find_aws_profile_names.return_value = ["dev-profile"]
+
     application.create_parameter_store_version_parameter(
         application_name=app_name, temporary_version=temporary_version
     )
 
     assert parameter_store.create_parameter.mock_calls[0] == mock.call(
-        f"/__platform__/versions/{app_name}", temporary_version
+        f"/__platform__/versions/{app_name}", temporary_version, "dev-profile"
     )
 
 
@@ -224,6 +226,21 @@ def test_update_terraform_application_resources_updates_module_versions(
 
     call: mock.call = terraform_modifier.mock_calls[0]
     assert set(call.kwargs["target_modules"].keys()) == {
-        "https://github.com/nsbno/terraform-aws-ecs-service",
-        "https://github.com/nsbno/terraform-aws-lambda",
+        "github.com/nsbno/terraform-aws-ecs-service",
+        "github.com/nsbno/terraform-aws-lambda",
     }
+
+
+def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    file_handler.get_subfolders.side_effect = [
+        ["prod", "staging", "test", "static", "modules", "lol"],
+        [],
+        [],
+    ]
+
+    result = application.find_all_environment_folders()
+
+    assert result == [Path("prod"), Path("staging"), Path("test")]

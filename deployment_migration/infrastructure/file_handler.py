@@ -12,21 +12,28 @@ class LocalFileHandler(FileHandler):
         """Create a file with the given content at the specified path."""
         # Ensure the directory exists
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        
+
         # Write the content to the file
-        with open(path, 'w') as file:
+        with open(path, "w") as file:
             file.write(content)
 
     def read_file(self: Self, path: Path) -> str:
         """Read the content of a file at the specified path."""
-        with open(path, 'r') as file:
+        with open(path, "r") as file:
             return file.read()
 
     def overwrite_file(self: Self, path: Path, content: str) -> None:
         """Overwrite a file with the given content at the specified path."""
-        with open(path, 'w') as file:
+        with open(path, "w") as file:
             file.write(content)
 
     def folder_exists(self: Self, path: Path) -> bool:
         """Check if a folder exists at the specified path."""
         return os.path.isdir(path)
+
+    def get_subfolders(self: Self, path: Path) -> list[Path]:
+        return [
+            Path(folder)
+            for folder in os.listdir(path)
+            if os.path.isdir(os.path.join(path, folder))
+        ]

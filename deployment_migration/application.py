@@ -33,6 +33,10 @@ class FileHandler(abc.ABC):
     def folder_exists(self: Self, path: Path):
         pass
 
+    @abc.abstractmethod
+    def get_subfolders(self: Self, path: Path) -> list[Path]:
+        pass
+
 
 class VersionControl(abc.ABC):
     @abc.abstractmethod
@@ -183,19 +187,26 @@ class DeploymentMigration:
         ]
 
         folders = [
-            Path(folder.path)
+            Path(folder)
             for parent in potential_folder_locations
-            if self.file_handler.folder_exists(parent)
-            for folder in os.scandir(parent)
-            if folder.is_dir()
+            for folder in self.file_handler.get_subfolders(parent)
         ]
 
-        stripped_folders = []
-        for folder in folders:
-            # TODO: FIX ME
-            if folder.name in ["modules", "infrastructure", "template", "static"]:
-                continue
-            stripped_folders.append(folder)
+        folders_to_find = [
+            "service",
+            "dev",
+            "development",
+            "test",
+            "testing",
+            "stage",
+            "staging",
+            "prod",
+            "production",
+        ]
+
+        stripped_folders = [
+            folder for folder in folders if folder.name.lower() in folders_to_find
+        ]
 
         return stripped_folders
 
