@@ -133,31 +133,17 @@ class CLIHandler:
 
         # Try to find terraform infrastructure folder automatically
         try:
-            self.console.print(
-                "[yellow]Trying to find terraform infrastructure folder...[/yellow]"
-            )
-
             terraform_folder = (
                 self.deployment_migration.find_terraform_infrastructure_folder()
             )
-            self.console.print(
-                f"[green]Found terraform infrastructure folder: {terraform_folder}[/green]"
-            )
-
-            terraform_folder_str = Prompt.ask(
-                "Enter the terraform infrastructure folder path",
-                default=str(terraform_folder),
-            )
-            terraform_folder = Path(terraform_folder_str)
         except FileNotFoundError:
-            terraform_folder_str = Prompt.ask(
-                "Enter the terraform infrastructure folder path",
-                default="terraform/template",
-            )
-            terraform_folder = Path(terraform_folder_str)
+            terraform_folder = None
 
-        # Get application details
-        self.console.print("[yellow]Getting application details...[/yellow]")
+        terraform_folder_str = Prompt.ask(
+            "Enter the terraform infrastructure folder path",
+            default=terraform_folder,
+        )
+        terraform_folder = Path(terraform_folder_str)
 
         try:
             guessed_application_name = self.deployment_migration.find_application_name(
@@ -201,6 +187,13 @@ class CLIHandler:
                 environment_folders
             )
         )
+
+        if "service" not in accounts:
+            # Sometimes, the user might not have a service environment set up in the repo
+            service_account_id = Prompt.ask(
+                "What is the account ID of your service account?"
+            )
+            accounts["service"] = service_account_id
 
         self.console.print("\n[bold]Please complete the following steps:[/bold]")
         for env, account in accounts.items():
