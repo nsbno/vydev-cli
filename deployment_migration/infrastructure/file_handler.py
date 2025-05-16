@@ -33,7 +33,7 @@ class LocalFileHandler(FileHandler):
 
     def get_subfolders(self: Self, path: Path) -> list[Path]:
         return [
-            Path(folder)
+            path / folder
             for folder in os.listdir(path)
             if os.path.isdir(os.path.join(path, folder))
         ]

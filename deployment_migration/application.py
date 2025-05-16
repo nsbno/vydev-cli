@@ -189,6 +189,7 @@ class DeploymentMigration:
         folders = [
             Path(folder)
             for parent in potential_folder_locations
+            if parent.exists()
             for folder in self.file_handler.get_subfolders(parent)
         ]
 
