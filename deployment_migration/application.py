@@ -244,7 +244,7 @@ class DeploymentMigration:
         updated_config = self.terraform.add_module(
             terraform_config,
             name="github_actions_oidc",
-            source="https://github.com/nsbno/terraform-aws-github-oidc",
+            source="github.com/nsbno/terraform-aws-github-oidc",
             version="0.0.1",
         )
 
