@@ -245,7 +245,7 @@ class DeploymentMigration:
             terraform_config,
             name="github_actions_oidc",
             source="github.com/nsbno/terraform-aws-github-oidc",
-            version="0.0.1",
+            version="0.1.0",
         )
 
         self.file_handler.overwrite_file(file_to_modify, updated_config)
