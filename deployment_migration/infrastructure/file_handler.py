@@ -37,3 +37,12 @@ class LocalFileHandler(FileHandler):
             for folder in os.listdir(path)
             if os.path.isdir(os.path.join(path, folder))
         ]
+
+    def delete_folder(self: Self, folder: Path, not_found_ok: bool) -> None:
+        """Delete a folder at the specified path."""
+        try:
+            os.rmdir(folder)
+        except FileNotFoundError:
+            if not_found_ok:
+                return
+            raise

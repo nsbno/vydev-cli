@@ -37,6 +37,10 @@ class FileHandler(abc.ABC):
     def get_subfolders(self: Self, path: Path) -> list[Path]:
         pass
 
+    @abc.abstractmethod
+    def delete_folder(self: Self, folder: Path, not_found_ok: bool) -> None:
+        pass
+
 
 class VersionControl(abc.ABC):
     @abc.abstractmethod
@@ -404,3 +408,10 @@ class DeploymentMigration:
         new_env_url = f"{repo_address}/settings/environments/new"
 
         return new_env_url, account_ids
+
+    def remove_old_deployment_setup(self) -> None:
+        """Removes the old deployment setup"""
+        folders_to_remove = [Path(".deployment"), Path(".circleci")]
+
+        for folder in folders_to_remove:
+            self.file_handler.delete_folder(folder, not_found_ok=True)

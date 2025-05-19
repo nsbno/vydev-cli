@@ -260,6 +260,11 @@ class CLIHandler:
             "[green]Parameter store version parameter created successfully![/green]"
         )
 
+        # Remove old deployment setup
+        self.console.print("[yellow]Removing old deployment setup...[/yellow]")
+        self.deployment_migration.remove_old_deployment_setup()
+        self.console.print("[green]Old deployment setup removed successfully![/green]")
+
 
 def main():
     """

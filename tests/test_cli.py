@@ -122,10 +122,13 @@ def test_upgrade_application_repo_success(cli_handler, mock_deployment_migration
     mock_deployment_migration.upgrade_terraform_application_resources.assert_called_once_with(str(terraform_folder))
     mock_deployment_migration.create_github_action_deployment_workflow.assert_called_once()
     mock_deployment_migration.create_parameter_store_version_parameter.assert_called_once()
+    mock_deployment_migration.remove_old_deployment_setup.assert_called_once()
 
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade Application Repo" in output
+    assert "Removing old deployment setup..." in output
+    assert "Old deployment setup removed successfully!" in output
     assert "Upgrading application terraform resources..." in output
     assert "Application terraform resources upgraded successfully!" in output
     assert "Creating GitHub Actions deployment workflow..." in output

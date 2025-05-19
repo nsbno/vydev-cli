@@ -244,3 +244,17 @@ def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
     result = application.find_all_environment_folders()
 
     assert result == [Path("prod"), Path("staging"), Path("test")]
+
+
+def test_remove_old_deployment_setup(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test that remove_old_deployment_setup correctly attempts to delete the specified folders."""
+    # Call the method
+    application.remove_old_deployment_setup()
+
+    # Verify that delete_folder was called for each folder with not_found_ok=True
+    assert file_handler.delete_folder.call_count == 2
+    file_handler.delete_folder.assert_any_call(Path(".deployment"), not_found_ok=True)
+    file_handler.delete_folder.assert_any_call(Path(".circleci"), not_found_ok=True)
