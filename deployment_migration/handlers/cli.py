@@ -123,6 +123,19 @@ class CLIHandler:
         self.deployment_migration.upgrade_aws_repo_terraform_resources(
             terraform_service_folder
         )
+        try:
+            self.deployment_migration.upgrade_aws_repo_alb_resources(
+                Path(terraform_infrastructure_folder)
+            )
+        except NotFoundError:
+            self.console.print(
+                "[yellow]"
+                "ALB module was not found in the terraform infrastructure folder. "
+                "Please migrate to it manually."
+                "It can be found at: https://github.com/nsbno/terraform-aws-loadbalancer"
+                "[/yellow]"
+            )
+            Confirm.ask("Have you migrated to using the ALB module?")
         self.console.print("[green]AWS repo upgraded successfully![/green]")
 
     def upgrade_application_repo(self) -> None:
