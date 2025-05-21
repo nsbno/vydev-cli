@@ -22,9 +22,7 @@ except ImportError:
                     "terraform-changes": {
                         "uses": "./.github/workflows/helpers.find-changes.terraform.yml"
                     },
-                    "build": {
-                        "uses": "./.github/workflows/build.python.yml"
-                    },
+                    "build": {"uses": "./.github/workflows/build.python.yml"},
                     "package": {
                         "needs": ["build"],
                         "uses": "./.github/workflows/package.s3.yml",
@@ -33,8 +31,8 @@ except ImportError:
                             "application_name": "test-app",
                             "artifact_name": "${{ needs.build.outputs.artifact_name }}",
                             "artifact_path": "${{ needs.build.outputs.artifact_path }}",
-                            "directory_to_zip": "${{ needs.build.outputs.artifact_path }}"
-                        }
+                            "directory_to_zip": "${{ needs.build.outputs.artifact_path }}",
+                        },
                     },
                     "deploy": {
                         "needs": ["terraform-changes", "build", "package"],
@@ -43,10 +41,10 @@ except ImportError:
                         "if": "!cancelled() && !contains(needs.*.results, 'failure')",
                         "with": {
                             "application_name": "test-app",
-                            "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}"
-                        }
-                    }
-                }
+                            "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
+                        },
+                    },
+                },
             }
         # Default case
         return {}
@@ -57,7 +55,9 @@ from deployment_migration.application import (
     ApplicationBuildTool,
     ApplicationRuntimeTarget,
 )
-from deployment_migration.infrastructure.github_actions_author import YAMLGithubActionsAuthor
+from deployment_migration.infrastructure.github_actions_author import (
+    YAMLGithubActionsAuthor,
+)
 
 
 @pytest.fixture
@@ -65,7 +65,9 @@ def github_actions_author() -> YAMLGithubActionsAuthor:
     return YAMLGithubActionsAuthor()
 
 
-def test_create_deployment_workflow_returns_valid_yaml(github_actions_author: YAMLGithubActionsAuthor):
+def test_create_deployment_workflow_returns_valid_yaml(
+    github_actions_author: YAMLGithubActionsAuthor,
+):
     """Test that the create_deployment_workflow method returns a valid YAML string."""
     # Arrange
     application_name = "test-app"
@@ -81,7 +83,6 @@ def test_create_deployment_workflow_returns_valid_yaml(github_actions_author: YA
         terraform_base_folder=terraform_base_folder,
     )
 
-
     # Assert
     # Verify that the result is a string
     assert isinstance(result, str)
@@ -95,7 +96,9 @@ def test_create_deployment_workflow_returns_valid_yaml(github_actions_author: YA
     assert "jobs" in workflow_dict
 
 
-def test_create_deployment_workflow_includes_application_name(github_actions_author: YAMLGithubActionsAuthor):
+def test_create_deployment_workflow_includes_application_name(
+    github_actions_author: YAMLGithubActionsAuthor,
+):
     """Test that the application name is included in the workflow."""
     # Arrange
     application_name = "test-app"
@@ -120,16 +123,20 @@ def test_create_deployment_workflow_includes_application_name(github_actions_aut
     assert "package" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["package"]
     assert "application_name" in workflow_dict["jobs"]["package"]["with"]
-    assert workflow_dict["jobs"]["package"]["with"]["application_name"] == application_name
+    assert (
+        workflow_dict["jobs"]["package"]["with"]["application_name"] == application_name
+    )
 
     # And in deploy job
     assert "deploy" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["deploy"]
-    assert "application_name" in workflow_dict["jobs"]["deploy"]["with"]
-    assert workflow_dict["jobs"]["deploy"]["with"]["application_name"] == application_name
+    assert "repo_name" in workflow_dict["jobs"]["deploy"]["with"]
+    assert workflow_dict["jobs"]["deploy"]["with"]["repo_name"] == application_name
 
 
-def test_create_deployment_workflow_includes_all_required_jobs(github_actions_author: YAMLGithubActionsAuthor):
+def test_create_deployment_workflow_includes_all_required_jobs(
+    github_actions_author: YAMLGithubActionsAuthor,
+):
     """Test that all required jobs are included in the workflow."""
     # Arrange
     application_name = "test-app"
@@ -158,4 +165,6 @@ def test_create_deployment_workflow_includes_all_required_jobs(github_actions_au
     # Check that the deploy job has the needs keyword and it includes all other jobs
     assert "needs" in workflow_dict["jobs"]["deploy"]
     for job in required_jobs[:-1]:  # Exclude 'deploy' itself from the needs check
-        assert job in workflow_dict["jobs"]["deploy"]["needs"], f"Job '{job}' not found in deploy job needs"
+        assert (
+            job in workflow_dict["jobs"]["deploy"]["needs"]
+        ), f"Job '{job}' not found in deploy job needs"

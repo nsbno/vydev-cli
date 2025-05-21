@@ -442,6 +442,6 @@ class DeploymentMigration:
         for folder in folders_to_remove:
             self.file_handler.delete_folder(folder, not_found_ok=True)
 
-    def commit_and_push(self: Self, message: str) -> None:
+    def commit_and_push_changes(self: Self, message: str) -> None:
         self.version_control.commit(message)
         self.version_control.push()
