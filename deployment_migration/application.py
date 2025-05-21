@@ -337,8 +337,9 @@ class DeploymentMigration:
         updated_config = self.terraform.update_module_versions(
             terraform_config,
             target_modules={
-                "github.com/nsbno/terraform-aws-ecs-service": "6.0.0-beta1",
-                "github.com/nsbno/terraform-aws-lambda": "6.0.0-beta1",
+                "github.com/nsbno/terraform-aws-ecs-service": "2.0.0-beta1",
+                # TODO: This is not released yet
+                "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
             },
         )
 
