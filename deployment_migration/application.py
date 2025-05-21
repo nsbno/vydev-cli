@@ -51,6 +51,10 @@ class VersionControl(abc.ABC):
     def get_origin(self: Self) -> str:
         pass
 
+    @abc.abstractmethod
+    def push(self: Self):
+        pass
+
 
 class Terraform(abc.ABC):
     @abc.abstractmethod
@@ -430,9 +434,13 @@ class DeploymentMigration:
 
         return new_env_url, account_ids
 
-    def remove_old_deployment_setup(self) -> None:
+    def remove_old_deployment_setup(self: Self) -> None:
         """Removes the old deployment setup"""
         folders_to_remove = [Path(".deployment"), Path(".circleci")]
 
         for folder in folders_to_remove:
             self.file_handler.delete_folder(folder, not_found_ok=True)
+
+    def commit_and_push(self: Self, message: str) -> None:
+        self.version_control.commit(message)
+        self.version_control.push()

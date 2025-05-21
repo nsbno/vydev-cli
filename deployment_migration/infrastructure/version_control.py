@@ -41,3 +41,11 @@ class GitVersionControl(VersionControl):
         except subprocess.CalledProcessError as e:
             # Handle git command errors
             raise RuntimeError(f"Git operation failed: {e}")
+
+    def push(self: Self):
+        """Push changes to the remote Git repository."""
+        try:
+            subprocess.run(["git", "push"], check=True)
+        except subprocess.CalledProcessError as e:
+            # Handle git command errors
+            raise RuntimeError(f"Git operation failed: {e}")

@@ -138,6 +138,14 @@ class CLIHandler:
             Confirm.ask("Have you migrated to using the ALB module?")
         self.console.print("[green]AWS repo upgraded successfully![/green]")
 
+        if Confirm.ask("Commit and push changes?"):
+            self.deployment_migration.commit_and_push_changes(
+                "Upgrade to new deployment pipeline"
+            )
+            self.console.print(
+                "[green]Changes committed and pushed successfully![/green]"
+            )
+
     def upgrade_application_repo(self) -> None:
         """
         Handle the application repo upgrade operation.
