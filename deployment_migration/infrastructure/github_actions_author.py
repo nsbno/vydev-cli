@@ -116,7 +116,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure')",
             "with": {
-                "application_name": application_name,
+                "repo_name": application_name,
                 "terraform-changes": f"${{{{ needs.terraform-changes.outputs.has-changes }}}}",
             },
         }
