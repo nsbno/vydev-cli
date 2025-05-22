@@ -282,7 +282,9 @@ class DeploymentMigration:
     def find_environment_aws_profile_names(self) -> dict[str, str]:
         runtime_environments = {}
 
-        runtime_environments_to_check = ["stage", "dev", "prod", "test"]
+        # TODO: Removed this for MVP testing with users, add it back!!!
+        #      runtime_environments_to_check = ["stage", "dev", "prod", "test"]
+        runtime_environments_to_check = ["test"]
         for environment in runtime_environments_to_check:
             try:
                 runtime_environments[environment] = (
