@@ -37,6 +37,10 @@ from deployment_migration.infrastructure.application_context import (
 )
 
 
+class Terminal:
+    pass
+
+
 class CLIHandler:
     """
     Command-line interface handler for the deployment migration application.

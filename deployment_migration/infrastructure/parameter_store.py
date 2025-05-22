@@ -70,7 +70,7 @@ class AWSAWS(AWS):
             profile_name = section.replace("profile ", "")
 
             if not any(
-                account_id in config[section].get(location)
+                account_id not in config[section].get(location, "")
                 for location in possible_account_id_locations
             ):
                 continue
