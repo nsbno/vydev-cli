@@ -57,14 +57,21 @@ class AWSAWS(AWS):
         config.read(config_path)
         matching_profiles = []
 
+        possible_account_id_locations = [
+            "role_arn",
+            "credential_process",
+            "granted_sso_account_id",
+        ]
+
         for section in config.sections():
             if not section.startswith("profile "):
                 continue
 
             profile_name = section.replace("profile ", "")
 
-            if (account_id not in config[section].get("role_arn", "")) and (
-                account_id not in config[section].get("credential_process", "")
+            if not any(
+                account_id in config[section].get(location)
+                for location in possible_account_id_locations
             ):
                 continue
 
