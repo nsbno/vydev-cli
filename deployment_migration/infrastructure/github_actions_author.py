@@ -58,7 +58,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": {
-                        "application_name": application_name,
+                        "repo_name": application_name,
                         "artifact_name": "${{ needs.build.outputs.artifact_name }}",
                         "artifact_path": "${{ needs.build.outputs.artifact_path }}",
                     },
