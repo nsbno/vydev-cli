@@ -71,7 +71,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "uses": self._workflow("package", "s3", "main"),
                     "secrets": "inherit",
                     "with": {
-                        "application_name": application_name,
+                        "repo_name": application_name,
                         "artifact_name": "${{ needs.build.outputs.artifact_name }}",
                         "artifact_path": "${{ needs.build.outputs.artifact_path }}",
                         "directory_to_zip": "${{ needs.build.outputs.artifact_path }}",
@@ -116,7 +116,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure')",
             "with": {
-                "repo_name": application_name,
+                "application_name": application_name,
                 "terraform-changes": f"${{{{ needs.terraform-changes.outputs.has-changes }}}}",
             },
         }
