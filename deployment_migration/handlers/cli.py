@@ -117,7 +117,7 @@ class CLIHandler:
         )
 
         # Confirm before proceeding
-        if not Confirm.ask(f"Upgrade the AWS Repository?"):
+        if not Confirm.ask("Upgrade the AWS Repository?"):
             return
 
         self.console.print("[yellow]Upgrading AWS repo...[/yellow]")
@@ -273,16 +273,6 @@ class CLIHandler:
         )
         self.console.print(
             "[green]GitHub Actions workflow created successfully![/green]"
-        )
-
-        self.console.print(
-            "[yellow]Creating parameter store version parameter...[/yellow]"
-        )
-        self.deployment_migration.create_parameter_store_version_parameter(
-            application_name, "latest"
-        )
-        self.console.print(
-            "[green]Parameter store version parameter created successfully![/green]"
         )
 
         # Remove old deployment setup
