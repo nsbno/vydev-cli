@@ -10,7 +10,7 @@ import boto3
 class AWSAWS(AWS):
     """Implementation of ParameterStore that interacts with AWS SSM Parameter Store."""
 
-    def __init__(self, client: Optional[boto3.client] = None):
+    def __init__(self: Self, client: Optional["boto3.client"] = None):
         """
         Initialize the AWS Parameter Store client.
 
@@ -19,7 +19,7 @@ class AWSAWS(AWS):
         self.ssm_client = client
 
     def create_parameter(
-        self: Self, name: str, value: str, profile_name: str = None
+        self: Self, name: str, value: str, profile_name: Optional[str] = None
     ) -> None:
         """
         Create a parameter in AWS SSM Parameter Store.
