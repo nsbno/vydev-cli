@@ -271,11 +271,16 @@ class DeploymentMigration:
 
         terraform_config = self.file_handler.read_file(file_to_modify)
 
+        environment_variable = (
+            "service" if "service" in terraform_folder else "var.environment"
+        )
+
         updated_config = self.terraform.add_module(
             terraform_config,
             name="github_actions_oidc",
             source="github.com/nsbno/terraform-aws-github-oidc",
             version="0.1.0",
+            variables={"environment": environment_variable},
         )
 
         self.file_handler.overwrite_file(file_to_modify, updated_config)
