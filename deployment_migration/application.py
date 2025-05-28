@@ -1,5 +1,4 @@
 import abc
-import os
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -81,7 +80,30 @@ class Terraform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find_account_id(self: Self, folder: str):
+    def find_module(
+        self: Self, module_source: str, infrastructure_folder: Path
+    ) -> Optional[dict[str, Any]]:
+        """Finds a module in the terraform config"""
+        pass
+
+    @abc.abstractmethod
+    def add_variable(
+        self: Self, terraform_config: str, target_module: str, variables: dict[str, Any]
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def add_test_listener_to_ecs_module(
+        self: Self, terraform_config: str, metadata_module_name: str
+    ) -> str:
+        """Add test_listener variable to the ECS module in a Terraform configuration.
+
+        This is a specific implementation for handling the test listener case.
+        """
+        pass
+
+    @abc.abstractmethod
+    def find_account_id(self: Self, folder: str) -> str:
         """Finds the AWS account ID in the terraform folder
 
         This is used for the environment folders, to figure out which account to use.
@@ -345,6 +367,31 @@ class DeploymentMigration:
             },
         )
 
+        if self.terraform.has_module(
+            "github.com/nsbno/terraform-aws-ecs-service",
+            Path(terraform_infrastructure_folder),
+        ):
+            module_info = self.terraform.find_module(
+                "github.com/nsbno/terraform-aws-account-metadata",
+                Path(terraform_infrastructure_folder),
+            )
+            if not module_info:
+                module_name = "account_metadata"
+                updated_config = self.terraform.add_module(
+                    terraform_config,
+                    name=module_name,
+                    source="github.com/nsbno/terraform-aws-account-metadata",
+                    version="0.1.0",
+                )
+            else:
+                module_name = module_info["name"]
+
+            # We need to add a new variable for the test listener
+            updated_config = self.terraform.add_test_listener_to_ecs_module(
+                updated_config,
+                metadata_module_name=module_name,
+            )
+
         self.file_handler.overwrite_file(terraform_main_file_path, updated_config)
 
     def is_repo_in_clean_state(self) -> bool:
@@ -429,7 +476,7 @@ class DeploymentMigration:
             environment_name = environment_folder_name.capitalize()
 
             account_ids[environment_name] = self.terraform.find_account_id(
-                environment_folder
+                str(environment_folder)
             )
 
         repo_address = self.version_control.get_origin()
