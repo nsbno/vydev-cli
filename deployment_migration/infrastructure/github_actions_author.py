@@ -47,8 +47,8 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "uses": self._workflow("test", "gradle", "main"),
                     "secrets": "inherit",
                     "with": {
-                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
-                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                        "artifact-name": "${{ needs.build.outputs.artifact-name }}",
+                        "artifact-path": "${{ needs.build.outputs.artifact-path }}",
                     },
                 }
             }
@@ -60,9 +60,9 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": {
-                        "repo_name": application_name,
-                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
-                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
+                        "repo-name": application_name,
+                        "artifact-name": "${{ needs.build.outputs.artifact-name }}",
+                        "artifact-path": "${{ needs.build.outputs.artifact-path }}",
                     },
                 }
             }
@@ -73,10 +73,10 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "uses": self._workflow("package", "s3", "main"),
                     "secrets": "inherit",
                     "with": {
-                        "repo_name": application_name,
-                        "artifact_name": "${{ needs.build.outputs.artifact_name }}",
-                        "artifact_path": "${{ needs.build.outputs.artifact_path }}",
-                        "directory_to_zip": "${{ needs.build.outputs.artifact_path }}",
+                        "repo-name": application_name,
+                        "artifact-name": "${{ needs.build.outputs.artifact-name }}",
+                        "artifact-path": "${{ needs.build.outputs.artifact-path }}",
+                        "directory-to-zip": "${{ needs.build.outputs.artifact-path }}",
                     },
                 }
             }
@@ -144,7 +144,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure')",
             "with": {
-                "application_name": application_name,
+                "application-name": application_name,
                 "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
             },
         }
