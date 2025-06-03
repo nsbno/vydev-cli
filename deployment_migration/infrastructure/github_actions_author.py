@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import yaml
 from typing import Self, Dict, Any
 
@@ -83,12 +85,38 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         return {**build_step, **test_step, **package_step}
 
+    def create_pull_request_workflow(
+        self: Self,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+    ) -> str:
+        """
+        Create a GitHub Actions pull request workflow for the application.
+        """
+        jobs = self._build_and_package(
+            application_name, application_build_tool, application_runtime_target
+        )
+        jobs.pop("package")
+
+        workflow: Dict[str, Any] = {
+            "name": "🔨 Pull Request 🔨",
+            "on": ["pull_request"],
+            "jobs": jobs,
+        }
+
+        # Convert the workflow to YAML
+        yaml_string = yaml.dump(workflow, sort_keys=False)
+
+        return yaml_string
+
     def create_deployment_workflow(
         self: Self,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
-        terraform_base_folder: str,
+        terraform_base_folder: Path,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -117,7 +145,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "if": "!cancelled() && !contains(needs.*.results, 'failure')",
             "with": {
                 "application_name": application_name,
-                "terraform-changes": f"${{{{ needs.terraform-changes.outputs.has-changes }}}}",
+                "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
             },
         }
 

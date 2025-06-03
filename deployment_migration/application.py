@@ -130,7 +130,18 @@ class AWS(abc.ABC):
 
 
 class GithubActionsAuthor(abc.ABC):
+    @abc.abstractmethod
     def create_deployment_workflow(
+        self: Self,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def create_pull_request_workflow(
         self: Self,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
@@ -260,6 +271,17 @@ class DeploymentMigration:
 
         self.file_handler.create_file(
             Path(".github/workflows/deploy.yml"), github_actions_deployment_workflow
+        )
+
+        pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
+            application_name,
+            application_build_tool,
+            application_runtime_target,
+            terraform_base_folder,
+        )
+
+        self.file_handler.create_file(
+            Path(".github/workflows/pull_request.yml"), pull_request_workflow
         )
 
     def upgrade_aws_repo_terraform_resources(
