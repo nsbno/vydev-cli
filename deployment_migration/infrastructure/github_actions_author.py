@@ -142,7 +142,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "needs": [name for name in jobs.keys()],
             "uses": self._workflow("deployment", "all-environments", "main"),
             "secrets": "inherit",
-            "if": "!cancelled() && !contains(needs.*.results, 'failure')",
+            "if": "!cancelled() && !contains(needs.*.results, 'failure') && success()",
             "with": {
                 "application-name": application_name,
                 "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
