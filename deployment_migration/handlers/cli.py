@@ -244,13 +244,6 @@ class CLIHandler:
                 )
                 return
 
-        # Confirm before proceeding
-        if not Confirm.ask(
-            f"Are you sure you want to upgrade the application repo at {terraform_folder}?"
-        ):
-            self.console.print("[bold red]Aborting upgrade[/bold red]")
-            return
-
         # Upgrade terraform resources
         self.console.print(
             "[yellow]Upgrading application terraform resources...[/yellow]"
