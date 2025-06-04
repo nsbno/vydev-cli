@@ -169,7 +169,7 @@ class CLIHandler:
             service_account_id = Prompt.ask(
                 "What is the account ID of your service account?"
             )
-            accounts["service"] = service_account_id
+            accounts["Service"] = service_account_id
 
         try:
             self.deployment_migration.find_environment_aws_profile_names()
