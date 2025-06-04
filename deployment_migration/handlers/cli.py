@@ -234,7 +234,7 @@ class CLIHandler:
             self.console.print(
                 f"Visit {new_env_url} to set up the following environment:"
             )
-            self.console.print(f"   - [italic]Environment[/italic]: {env}")
+            self.console.print(f"   - [italic]Name[/italic]: {env}")
             self.console.print(
                 f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
             )
