@@ -301,13 +301,23 @@ class DeploymentMigration:
             "service" if "service" in terraform_folder else "var.environment"
         )
 
-        updated_config = self.terraform.add_module(
-            terraform_config,
-            name="github_actions_oidc",
-            source="github.com/nsbno/terraform-aws-github-oidc",
-            version="0.1.0",
-            variables={"environment": environment_variable},
-        )
+        if self.terraform.has_module(
+            "github.com/nsbno/terraform-aws-github-oidc", Path(terraform_folder)
+        ):
+            updated_config = self.terraform.update_module_versions(
+                terraform_config,
+                target_modules={
+                    "github.com/nsbno/terraform-aws-github-oidc": "0.1.0",
+                },
+            )
+        else:
+            updated_config = self.terraform.add_module(
+                terraform_config,
+                name="github_actions_oidc",
+                source="github.com/nsbno/terraform-aws-github-oidc",
+                version="0.1.0",
+                variables={"environment": environment_variable},
+            )
 
         self.file_handler.overwrite_file(file_to_modify, updated_config)
 
