@@ -142,7 +142,12 @@ class CLIHandler:
             Confirm.ask("Have you migrated to using the ALB module?")
         self.console.print("[green]AWS repo upgraded successfully![/green]")
 
-        if Confirm.ask("Commit and push changes?"):
+        changed_files = self.deployment_migration.changed_files()
+        self.console.print(f"\nThe following files have changes: {changed_files}")
+
+        if Confirm.ask(
+            "Commit and push the changes? If you press no you will have to create the commit and push it manually"
+        ):
             self.deployment_migration.commit_and_push_changes(
                 "Upgrade to new deployment pipeline"
             )
@@ -272,6 +277,19 @@ class CLIHandler:
         self.console.print("[yellow]Removing old deployment setup...[/yellow]")
         self.deployment_migration.remove_old_deployment_setup()
         self.console.print("[green]Old deployment setup removed successfully![/green]")
+
+        changed_files = self.deployment_migration.changed_files()
+        self.console.print(f"\nThe following files have changes: {changed_files}")
+
+        if Confirm.ask(
+            "Commit and push the changes? If you press no you will have to create the commit and push it manually"
+        ):
+            self.deployment_migration.commit_and_push_changes(
+                "Upgrade to new deployment pipeline"
+            )
+            self.console.print(
+                "[green]Changes committed and pushed successfully![/green]"
+            )
 
 
 def main():

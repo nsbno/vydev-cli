@@ -49,3 +49,15 @@ class GitVersionControl(VersionControl):
         except subprocess.CalledProcessError as e:
             # Handle git command errors
             raise RuntimeError(f"Git operation failed: {e}")
+
+    def changed_files(self) -> list[str]:
+        """Return list of changed files."""
+        git_output = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        changed_files = git_output.stdout.splitlines()
+
+        return changed_files

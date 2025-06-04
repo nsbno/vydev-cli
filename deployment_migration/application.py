@@ -51,7 +51,11 @@ class VersionControl(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def push(self: Self):
+    def push(self: Self) -> None:
+        pass
+
+    @abc.abstractmethod
+    def changed_files(self) -> list[str]:
         pass
 
 
@@ -509,3 +513,6 @@ class DeploymentMigration:
     def commit_and_push_changes(self: Self, message: str) -> None:
         self.version_control.commit(message)
         self.version_control.push()
+
+    def changed_files(self) -> list[str]:
+        return self.version_control.changed_files()
