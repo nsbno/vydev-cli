@@ -364,19 +364,6 @@ class DeploymentMigration:
 
         return profile_names
 
-    def create_parameter_store_version_parameter(
-        self: Self,
-        application_name: str,
-        temporary_version: str = "latest",
-    ) -> None:
-        """Creates the parameter store version parameter for the application"""
-        parameter_name = f"/__platform__/versions/{application_name}"
-
-        account_profiles = self.find_environment_aws_profile_names()
-
-        for environment, profile_name in account_profiles.items():
-            self.aws.create_parameter(parameter_name, temporary_version, profile_name)
-
     def upgrade_terraform_application_resources(
         self: Self,
         terraform_infrastructure_folder: str,

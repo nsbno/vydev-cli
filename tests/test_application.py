@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -169,24 +168,6 @@ def test_upgrades_aws_repo_terraform_resources(
 
     file_to_modify = Path("terraform/main.tf")
     assert written_file == {file_to_modify: terraform_config + expected_file}
-
-
-def test_creates_parameter_store_version_parameter(
-    application: DeploymentMigration,
-    parameter_store: AWS,
-) -> None:
-    app_name = "test-app"
-    temporary_version = "latest"
-
-    parameter_store.find_aws_profile_names.return_value = ["dev-profile"]
-
-    application.create_parameter_store_version_parameter(
-        application_name=app_name, temporary_version=temporary_version
-    )
-
-    assert parameter_store.create_parameter.mock_calls[0] == mock.call(
-        f"/__platform__/versions/{app_name}", temporary_version, "dev-profile"
-    )
 
 
 def test_updates_and_writes_terraform_application_resources(
