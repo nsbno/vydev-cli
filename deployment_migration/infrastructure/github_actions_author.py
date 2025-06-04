@@ -100,6 +100,11 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         )
         jobs.pop("package")
 
+        jobs["terraform-plan"] = {
+            "uses": self._workflow("helpers", "terraform-plan", "main"),
+            "secrets": "inherit",
+        }
+
         workflow: Dict[str, Any] = {
             "name": "🔨 Pull Request 🔨",
             "on": ["pull_request"],
