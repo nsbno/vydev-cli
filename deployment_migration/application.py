@@ -285,7 +285,7 @@ class DeploymentMigration:
         )
 
         self.file_handler.create_file(
-            Path(".github/workflows/pull_request.yml"), pull_request_workflow
+            Path(".github/workflows/pull-request.yml"), pull_request_workflow
         )
 
     def upgrade_aws_repo_terraform_resources(
