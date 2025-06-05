@@ -116,11 +116,7 @@ class CLIHandler:
             ),
         )
 
-        # Confirm before proceeding
-        if not Confirm.ask("Upgrade the AWS Repository?"):
-            return
-
-        self.console.print("[yellow]Upgrading AWS repo...[/yellow]")
+        self.console.print("\n[yellow]Upgrading AWS repo...[/yellow]")
         self.deployment_migration.upgrade_aws_repo_terraform_resources(
             terraform_infrastructure_folder
         )
@@ -236,7 +232,9 @@ class CLIHandler:
             self.console.print(
                 f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
             )
-            if not Confirm.ask("\nHave you created this environment in GH?"):
+            if not Confirm.ask(
+                "\nHave you created this environment in GH?", choices=["yes"]
+            ):
                 self.console.print(
                     "[bold red]Please complete the environment setup before continuing[/bold red]"
                 )
