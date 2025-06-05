@@ -144,16 +144,9 @@ class CLIHandler:
 
         changed_files = self.deployment_migration.changed_files()
         self.console.print(f"\nThe following files have changes: {changed_files}")
-
-        if Confirm.ask(
-            "Commit and push the changes? If you press no you will have to create the commit and push it manually"
-        ):
-            self.deployment_migration.commit_and_push_changes(
-                "Upgrade to new deployment pipeline"
-            )
-            self.console.print(
-                "[green]Changes committed and pushed successfully![/green]"
-            )
+        self.console.print(
+            "[bold]Please review, commit, and push the changes before proceeding.[/bold]"
+        )
 
     def upgrade_application_repo(self) -> None:
         """
@@ -280,16 +273,9 @@ class CLIHandler:
 
         changed_files = self.deployment_migration.changed_files()
         self.console.print(f"\nThe following files have changes: {changed_files}")
-
-        if Confirm.ask(
-            "Commit and push the changes? If you press no you will have to create the commit and push it manually"
-        ):
-            self.deployment_migration.commit_and_push_changes(
-                "Upgrade to new deployment pipeline"
-            )
-            self.console.print(
-                "[green]Changes committed and pushed successfully![/green]"
-            )
+        self.console.print(
+            "[bold]Please review, commit and push the changes before proceeding.[/bold]"
+        )
 
 
 def main():
