@@ -5,7 +5,7 @@ description = ""
 authors = [
     {name = "Nicolas Harlem Eide",email = "nicolas@harlemeide.net"}
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "black (>=25.1.0,<26.0.0)",
     "types-mock (>=5.2.0.20250306,<6.0.0.0)",
