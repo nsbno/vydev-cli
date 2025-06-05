@@ -509,7 +509,7 @@ class DeploymentMigration:
             )
 
         repo_address = self.version_control.get_origin()
-        new_env_url = f"{repo_address}/settings/environments/new"
+        new_env_url = f"https://{repo_address}/settings/environments/new"
 
         return new_env_url, account_ids
 
