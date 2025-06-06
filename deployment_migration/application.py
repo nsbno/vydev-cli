@@ -466,6 +466,8 @@ class DeploymentMigration:
             raise NotFoundError(
                 "Found more than one application name. That is not implemented yet."
             )
+        elif len(names) == 0:
+            raise NotFoundError("Could not find an application name")
         return names[0]
 
     def find_build_tool(self) -> ApplicationBuildTool:
