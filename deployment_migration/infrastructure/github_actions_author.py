@@ -43,13 +43,8 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         if add_tests:
             test_step = {
                 "test": {
-                    "needs": ["build"],
                     "uses": self._workflow("test", "gradle", "main"),
                     "secrets": "inherit",
-                    "with": {
-                        "artifact-name": "${{ needs.build.outputs.artifact-name }}",
-                        "artifact-path": "${{ needs.build.outputs.artifact-path }}",
-                    },
                 }
             }
 
