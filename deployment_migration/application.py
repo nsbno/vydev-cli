@@ -40,6 +40,10 @@ class FileHandler(abc.ABC):
     def delete_folder(self: Self, folder: Path, not_found_ok: bool) -> None:
         pass
 
+    @abc.abstractmethod
+    def current_folder_name(self) -> str:
+        pass
+
 
 class VersionControl(abc.ABC):
     @abc.abstractmethod
@@ -526,3 +530,9 @@ class DeploymentMigration:
 
     def changed_files(self) -> list[str]:
         return self.version_control.changed_files()
+
+    def is_aws_repo(self) -> bool:
+        """Checks if the current folder is an -aws repo"""
+        cwd = self.file_handler.current_folder_name()
+
+        return cwd.endswith("-aws")

@@ -85,6 +85,21 @@ class CLIHandler:
         """
         Handle the AWS repo upgrade operation.
         """
+        if not self.deployment_migration.is_aws_repo():
+            self.console.print(
+                "[bold yellow]"
+                "Warning: This repo doesn't end with `-aws`."
+                "[/bold yellow]\n"
+                "This is just a safety check to make sure you're not upgrading the wrong repo."
+            )
+            if not Confirm.ask("Is this repo your team's AWS repo?"):
+                self.console.print(
+                    "\n"
+                    "Ok, aborting!\n"
+                    "Just start the tool again when you are in the right repo."
+                )
+                return
+
         self.console.print(Panel("[bold]Upgrade AWS Repo[/bold]"))
 
         # Get terraform folder from user

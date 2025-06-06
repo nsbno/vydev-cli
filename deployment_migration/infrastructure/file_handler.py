@@ -8,6 +8,9 @@ from deployment_migration.application import FileHandler
 class LocalFileHandler(FileHandler):
     """Implementation of FileHandler that interacts with the local filesystem."""
 
+    def current_folder_name(self) -> str:
+        return os.getcwd()
+
     def create_file(self: Self, path: Path, content: str) -> None:
         """Create a file with the given content at the specified path."""
         # Ensure the directory exists
