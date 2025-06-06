@@ -1,3 +1,5 @@
+import shutil
+from logging import shutdown
 import os
 from pathlib import Path
 from typing import Self
@@ -44,7 +46,7 @@ class LocalFileHandler(FileHandler):
     def delete_folder(self: Self, folder: Path, not_found_ok: bool) -> None:
         """Delete a folder at the specified path."""
         try:
-            os.rmdir(folder)
+            shutil.rmtree(folder)
         except FileNotFoundError:
             if not_found_ok:
                 return
