@@ -506,6 +506,8 @@ class DeploymentMigration:
 
         for environment_folder in environment_folders:
             environment_folder_name = environment_folder.name
+            if environment_folder_name == "prod":
+                environment_folder_name = "production"
             environment_name = environment_folder_name.capitalize()
 
             account_ids[environment_name] = self.terraform.find_account_id(
