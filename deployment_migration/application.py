@@ -350,7 +350,7 @@ class DeploymentMigration:
 
         updated_config = self.terraform.update_module_versions(
             terraform_config,
-            target_modules={"github.com/nsbno/terraform-aws-loadbalancer": "5.0.0"},
+            target_modules={"github.com/nsbno/terraform-aws-loadbalancer": "5.1.0"},
         )
 
         self.file_handler.overwrite_file(
