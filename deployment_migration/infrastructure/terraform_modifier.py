@@ -123,7 +123,13 @@ class RegexTerraformModifier(Terraform):
         for var_name, var_value in variables.items():
             # Handle different types of values
             if isinstance(var_value, str):
-                module_block += f'\n  {var_name} = "{var_value}"'
+                if not (
+                    var_value.startswith("module.") or var_value.startswith("var.")
+                ):
+                    # If the value doesn't start with "module." or "var.", wrap it in quotes
+                    var_value = f'"{var_value}"'
+
+                module_block += f"\n  {var_name} = {var_value}"
             elif isinstance(var_value, bool):
                 module_block += f"\n  {var_name} = {str(var_value).lower()}"
             elif isinstance(var_value, dict):
@@ -287,7 +293,9 @@ class RegexTerraformModifier(Terraform):
             # Replace the lb_listeners content in the module
             # Make sure to include the closing brackets }] at the end
             full_lb_listeners = f"lb_listeners = [{{{lb_listeners_content}}}]"
-            modified_full_lb_listeners = f"lb_listeners = [{{{modified_lb_listeners_content}}}]"
+            modified_full_lb_listeners = (
+                f"lb_listeners = [{{{modified_lb_listeners_content}}}]"
+            )
             modified_module_content = module_content.replace(
                 full_lb_listeners, modified_full_lb_listeners
             )
