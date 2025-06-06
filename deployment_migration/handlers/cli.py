@@ -247,13 +247,10 @@ class CLIHandler:
             self.console.print(
                 f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
             )
-            if not Confirm.ask(
-                "\nHave you created this environment in GH?", choices=["yes"]
-            ):
+            while not Confirm.ask("\nHave you created this environment in GH?"):
                 self.console.print(
                     "[bold red]Please complete the environment setup before continuing[/bold red]"
                 )
-                return
 
         # Upgrade terraform resources
         self.console.print(
