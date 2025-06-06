@@ -210,7 +210,7 @@ class CLIHandler:
         except NotFoundError:
             guessed_application_name = None
         application_name = Prompt.ask(
-            "What is the name of the deployment artifact?",
+            "What is the name of the application's ECR Repository?",
             default=guessed_application_name,
         )
 
