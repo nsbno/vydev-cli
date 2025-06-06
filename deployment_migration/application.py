@@ -330,20 +330,26 @@ class DeploymentMigration:
         infrastructure_folder: Path,
     ):
         """Updates or adds ALB to the AWS repo"""
-        loadbalancer_module_exists = self.terraform.has_module(
+        loadbalancer_module = self.terraform.find_module(
             "github.com/nsbno/terraform-aws-loadbalancer",
             infrastructure_folder,
         )
 
-        if not loadbalancer_module_exists:
+        terraform_config = self.file_handler.read_file(loadbalancer_module["file_path"])
+
+        if not loadbalancer_module:
             raise NotFoundError(
                 "You are not using the shared loadbalancer module.\n"
                 "Please migrate to using the following module manually https://github.com/nsbno/terraform-aws-loadbalancer"
             )
 
-        self.terraform.update_module_versions(
-            str(infrastructure_folder),
+        updated_config = self.terraform.update_module_versions(
+            terraform_config,
             target_modules={"github.com/nsbno/terraform-aws-loadbalancer": "5.0.0"},
+        )
+
+        self.file_handler.overwrite_file(
+            loadbalancer_module["file_path"], updated_config
         )
 
     def find_environment_aws_profile_names(self) -> dict[str, str]:
