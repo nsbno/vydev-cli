@@ -203,15 +203,20 @@ class CLIHandler:
         )
         terraform_folder = Path(terraform_folder_str)
 
+        # TODO: Fix the split between application name and repo name
         try:
-            guessed_application_name = self.deployment_migration.find_application_name(
+            guessed_repository_name = self.deployment_migration.find_application_name(
                 terraform_folder
             )
         except NotFoundError:
-            guessed_application_name = None
-        application_name = Prompt.ask(
+            guessed_repository_name = None
+        repository_name = Prompt.ask(
             "What is the name of the application's ECR Repository?",
-            default=guessed_application_name,
+            default=guessed_repository_name,
+        )
+
+        application_name = Prompt.ask(
+            "What is the name of your application?",
         )
 
         try:
@@ -267,6 +272,7 @@ class CLIHandler:
             "[yellow]Creating GitHub Actions deployment workflow...[/yellow]"
         )
         self.deployment_migration.create_github_action_deployment_workflow(
+            repository_name,
             application_name,
             build_tool,
             runtime_target,

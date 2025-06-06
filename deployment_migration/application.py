@@ -141,6 +141,7 @@ class GithubActionsAuthor(abc.ABC):
     @abc.abstractmethod
     def create_deployment_workflow(
         self: Self,
+        repository_name: str,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
@@ -151,6 +152,7 @@ class GithubActionsAuthor(abc.ABC):
     @abc.abstractmethod
     def create_pull_request_workflow(
         self: Self,
+        repository_name: str,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
@@ -262,6 +264,7 @@ class DeploymentMigration:
 
     def create_github_action_deployment_workflow(
         self: Self,
+        repository_name: str,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
@@ -270,6 +273,7 @@ class DeploymentMigration:
         """Creates the github action deployment workflow"""
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
+                repository_name,
                 application_name,
                 application_build_tool,
                 application_runtime_target,
@@ -282,6 +286,7 @@ class DeploymentMigration:
         )
 
         pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
+            repository_name,
             application_name,
             application_build_tool,
             application_runtime_target,

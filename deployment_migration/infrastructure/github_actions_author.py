@@ -18,7 +18,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
     def _build_and_package(
         self,
-        application_name: str,
+        repository_name: str,
         build_tool: ApplicationBuildTool,
         runtime_target: ApplicationRuntimeTarget,
         add_tests: bool = True,
@@ -55,7 +55,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": {
-                        "repo-name": application_name,
+                        "repo-name": repository_name,
                         "artifact-name": "${{ needs.build.outputs.artifact-name }}",
                         "artifact-path": "${{ needs.build.outputs.artifact-path }}",
                     },
@@ -68,7 +68,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "uses": self._workflow("package", "s3", "main"),
                     "secrets": "inherit",
                     "with": {
-                        "repo-name": application_name,
+                        "repo-name": repository_name,
                         "artifact-name": "${{ needs.build.outputs.artifact-name }}",
                         "artifact-path": "${{ needs.build.outputs.artifact-path }}",
                         "directory-to-zip": "${{ needs.build.outputs.artifact-path }}",
@@ -82,6 +82,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
     def create_pull_request_workflow(
         self: Self,
+        repository_name: str,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
@@ -91,7 +92,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         Create a GitHub Actions pull request workflow for the application.
         """
         jobs = self._build_and_package(
-            application_name, application_build_tool, application_runtime_target
+            repository_name, application_build_tool, application_runtime_target
         )
         jobs.pop("package")
 
@@ -113,6 +114,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
     def create_deployment_workflow(
         self: Self,
+        repository_name: str,
         application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
@@ -133,7 +135,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 "secrets": "inherit",
             },
             **self._build_and_package(
-                application_name, application_build_tool, application_runtime_target
+                repository_name, application_build_tool, application_runtime_target
             ),
         }
 
