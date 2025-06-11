@@ -226,7 +226,7 @@ class CLIHandler:
             guessed_build_tool = None
 
         build_tool = None
-        while not build_tool:
+        while build_tool is None:
             build_tool = Prompt.ask(
                 "Select the application build tool",
                 choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
