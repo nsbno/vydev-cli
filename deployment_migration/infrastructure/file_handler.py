@@ -10,6 +10,9 @@ from deployment_migration.application import FileHandler
 class LocalFileHandler(FileHandler):
     """Implementation of FileHandler that interacts with the local filesystem."""
 
+    def file_exists(self, location: str) -> bool:
+        return os.path.exists(location)
+
     def current_folder_name(self) -> str:
         return os.getcwd()
 

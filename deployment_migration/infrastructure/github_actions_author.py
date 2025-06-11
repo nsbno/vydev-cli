@@ -22,6 +22,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         build_tool: ApplicationBuildTool,
         runtime_target: ApplicationRuntimeTarget,
         add_tests: bool = True,
+        dockerfile_path: str = None,
     ) -> dict[str, Any]:
         if build_tool == ApplicationBuildTool.GRADLE:
             build_step = {
@@ -49,16 +50,21 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             }
 
         if runtime_target == ApplicationRuntimeTarget.ECS:
+            with_params = {
+                "repo-name": repository_name,
+                "artifact-name": "${{ needs.build.outputs.artifact-name }}",
+                "artifact-path": "${{ needs.build.outputs.artifact-path }}",
+            }
+
+            if dockerfile_path and dockerfile_path != Path("Dockerfile"):
+                with_params["dockerfile"] = dockerfile_path
+
             package_step = {
                 "package": {
                     "uses": self._workflow("package", "docker", "main"),
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
-                    "with": {
-                        "repo-name": repository_name,
-                        "artifact-name": "${{ needs.build.outputs.artifact-name }}",
-                        "artifact-path": "${{ needs.build.outputs.artifact-path }}",
-                    },
+                    "with": with_params,
                 }
             }
         elif runtime_target == ApplicationRuntimeTarget.LAMBDA:
@@ -87,12 +93,16 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
+        dockerfile_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions pull request workflow for the application.
         """
         jobs = self._build_and_package(
-            repository_name, application_build_tool, application_runtime_target
+            repository_name,
+            application_build_tool,
+            application_runtime_target,
+            dockerfile_path=dockerfile_path,
         )
         jobs.pop("package")
 
@@ -119,6 +129,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
+        dockerfile_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -127,6 +138,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         :param application_build_tool: The build tool used by the application (PYTHON or GRADLE)
         :param application_runtime_target: The runtime target for the application (LAMBDA or ECS)
         :param terraform_base_folder: The base folder for Terraform configuration
+        :param dockerfile_path: The path to the Dockerfile to use for building the Docker image
         :return: The GitHub Actions workflow as a YAML string
         """
         jobs = {
@@ -135,7 +147,10 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 "secrets": "inherit",
             },
             **self._build_and_package(
-                repository_name, application_build_tool, application_runtime_target
+                repository_name,
+                application_build_tool,
+                application_runtime_target,
+                dockerfile_path=dockerfile_path,
             ),
         }
 

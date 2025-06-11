@@ -44,6 +44,10 @@ class FileHandler(abc.ABC):
     def current_folder_name(self) -> str:
         pass
 
+    @abc.abstractmethod
+    def file_exists(self, location: str) -> bool:
+        pass
+
 
 class VersionControl(abc.ABC):
     @abc.abstractmethod
@@ -146,6 +150,7 @@ class GithubActionsAuthor(abc.ABC):
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
+        dockerfile_path: str = None,
     ) -> str:
         pass
 
@@ -157,6 +162,7 @@ class GithubActionsAuthor(abc.ABC):
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
+        dockerfile_path: str = None,
     ) -> str:
         pass
 
@@ -291,6 +297,15 @@ class DeploymentMigration:
         terraform_base_folder: Path,
     ) -> None:
         """Creates the github action deployment workflow"""
+        # Find Dockerfile if we're using ECS
+        dockerfile_path = None
+        if application_runtime_target == ApplicationRuntimeTarget.ECS:
+            try:
+                dockerfile_path = str(self.find_dockerfile())
+            except NotFoundError:
+                # If Dockerfile is not found, we'll proceed without it
+                pass
+
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -298,6 +313,7 @@ class DeploymentMigration:
                 application_build_tool,
                 application_runtime_target,
                 terraform_base_folder,
+                dockerfile_path=dockerfile_path,
             )
         )
 
@@ -311,6 +327,7 @@ class DeploymentMigration:
             application_build_tool,
             application_runtime_target,
             terraform_base_folder,
+            dockerfile_path=dockerfile_path,
         )
 
         self.file_handler.create_file(
@@ -571,6 +588,16 @@ class DeploymentMigration:
         cwd = self.file_handler.current_folder_name()
 
         return cwd.endswith("-aws")
+
+    def find_dockerfile(self) -> Path:
+        """Finds the Dockerfile in the current folder"""
+        locations = ["Dockerfile", "Docker/Dockerfile", "docker/Dockerfile"]
+
+        for location in locations:
+            if self.file_handler.file_exists(location):
+                return Path(location)
+
+        raise NotFoundError("Could not find a Dockerfile")
 
     def initialize_github_environments(self, accounts: dict[str, str], repo_address: str) -> None:
         # This will create the environment if it doesn't exist
