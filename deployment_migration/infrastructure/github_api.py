@@ -5,15 +5,18 @@ from deployment_migration.application import GithubApi
 
 
 class GithubApiImplementation(GithubApi):
-    def _run_cmd(self, cmd):
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.returncode, result.stdout.strip(), result.stderr.strip()
+    def _run_cmd(self, cmd: str, interactive=False) -> tuple[int, str, str]:
+        if interactive:
+            result = subprocess.run(cmd, shell=True)
+        else:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result.returncode, getattr(result, "stdout", "").strip(), getattr(result, "stderr", "").strip()
 
     def ensure_authenticated(self: Self) -> None:
         code, _, _ = self._run_cmd("gh auth status")
         if code != 0:
             print("Not authenticated. Running 'gh auth login' (follow prompts in browser)...")
-            self._run_cmd("gh auth login --web")
+            self._run_cmd("gh auth login --web", interactive=True)
         else:
             print("Already authenticated.")
 
