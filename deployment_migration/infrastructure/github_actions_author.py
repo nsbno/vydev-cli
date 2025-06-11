@@ -23,13 +23,21 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         runtime_target: ApplicationRuntimeTarget,
         add_tests: bool = True,
         dockerfile_path: str = None,
+        gradle_folder_path: str = None,
     ) -> dict[str, Any]:
         if build_tool == ApplicationBuildTool.GRADLE:
-            build_step = {
-                "build": {
-                    "uses": self._workflow("build", "gradle", "main"),
-                    "secrets": "inherit",
+            build_with_params = {
+                "uses": self._workflow("build", "gradle", "main"),
+                "secrets": "inherit",
+            }
+
+            if gradle_folder_path and gradle_folder_path != ".":
+                build_with_params["with"] = {
+                    "working-directory": gradle_folder_path
                 }
+
+            build_step = {
+                "build": build_with_params
             }
         elif build_tool == ApplicationBuildTool.PYTHON:
             build_step = {
@@ -42,11 +50,18 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         test_step = {}
         if add_tests:
-            test_step = {
-                "test": {
-                    "uses": self._workflow("test", "gradle", "main"),
-                    "secrets": "inherit",
+            test_with_params = {
+                "uses": self._workflow("test", "gradle", "main"),
+                "secrets": "inherit",
+            }
+
+            if build_tool == ApplicationBuildTool.GRADLE and gradle_folder_path and gradle_folder_path != ".":
+                test_with_params["with"] = {
+                    "working-directory": gradle_folder_path
                 }
+
+            test_step = {
+                "test": test_with_params
             }
 
         if runtime_target == ApplicationRuntimeTarget.ECS:
@@ -94,6 +109,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
         dockerfile_path: str = None,
+        gradle_folder_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions pull request workflow for the application.
@@ -103,6 +119,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             application_build_tool,
             application_runtime_target,
             dockerfile_path=dockerfile_path,
+            gradle_folder_path=gradle_folder_path,
         )
         jobs.pop("package")
 
@@ -130,6 +147,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
         dockerfile_path: str = None,
+        gradle_folder_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -151,6 +169,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 application_build_tool,
                 application_runtime_target,
                 dockerfile_path=dockerfile_path,
+                gradle_folder_path=gradle_folder_path,
             ),
         }
 

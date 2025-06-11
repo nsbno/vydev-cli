@@ -77,6 +77,7 @@ def test_create_deployment_workflow_returns_valid_yaml(
 
     # Act
     result = github_actions_author.create_deployment_workflow(
+        repository_name=application_name,
         application_name=application_name,
         application_build_tool=application_build_tool,
         application_runtime_target=application_runtime_target,
@@ -108,6 +109,7 @@ def test_create_deployment_workflow_includes_application_name(
 
     # Act
     result = github_actions_author.create_deployment_workflow(
+        repository_name=application_name,
         application_name=application_name,
         application_build_tool=application_build_tool,
         application_runtime_target=application_runtime_target,
@@ -122,16 +124,16 @@ def test_create_deployment_workflow_includes_application_name(
     assert "jobs" in workflow_dict
     assert "package" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["package"]
-    assert "application_name" in workflow_dict["jobs"]["package"]["with"]
+    assert "repo-name" in workflow_dict["jobs"]["package"]["with"]
     assert (
-        workflow_dict["jobs"]["package"]["with"]["application_name"] == application_name
+        workflow_dict["jobs"]["package"]["with"]["repo-name"] == application_name
     )
 
     # And in deploy job
     assert "deploy" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["deploy"]
-    assert "repo_name" in workflow_dict["jobs"]["deploy"]["with"]
-    assert workflow_dict["jobs"]["deploy"]["with"]["repo_name"] == application_name
+    assert "applications" in workflow_dict["jobs"]["deploy"]["with"]
+    assert workflow_dict["jobs"]["deploy"]["with"]["applications"] == application_name
 
 
 def test_create_deployment_workflow_includes_all_required_jobs(
@@ -146,6 +148,7 @@ def test_create_deployment_workflow_includes_all_required_jobs(
 
     # Act
     result = github_actions_author.create_deployment_workflow(
+        repository_name=application_name,
         application_name=application_name,
         application_build_tool=application_build_tool,
         application_runtime_target=application_runtime_target,

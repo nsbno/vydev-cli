@@ -1,4 +1,5 @@
 """Command-line interface for the deployment migration application."""
+
 import shutil
 import sys
 import argparse
@@ -270,8 +271,12 @@ class CLIHandler:
 
         self.console.print(hr_line)
         if shutil.which("gh"):
-            self.console.print("GitHub CLI is installed, using it to create GH environments.")
-            self.deployment_migration.initialize_github_environments(accounts, repo_address)
+            self.console.print(
+                "GitHub CLI is installed, using it to create GH environments."
+            )
+            self.deployment_migration.initialize_github_environments(
+                accounts, repo_address
+            )
         else:
             self.console.print("\n[bold]Please complete the following steps:[/bold]")
             for env, account in accounts.items():
@@ -391,7 +396,7 @@ def main():
             terraform=terraform_modifier,
             aws=parameter_store,
             application_context=application_context,
-            github_api=github_api
+            github_api=github_api,
         )
 
     console.print(

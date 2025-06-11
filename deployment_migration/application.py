@@ -151,6 +151,7 @@ class GithubActionsAuthor(abc.ABC):
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
         dockerfile_path: str = None,
+        gradle_file_path: str = None,
     ) -> str:
         pass
 
@@ -306,6 +307,14 @@ class DeploymentMigration:
                 # If Dockerfile is not found, we'll proceed without it
                 pass
 
+        # Find Gradle folder if we're using Gradle
+        if application_build_tool == ApplicationBuildTool.GRADLE:
+            try:
+                gradle_folder_path = str(self.find_gradle_folder())
+            except NotFoundError:
+                # If Gradle folder is not found, we'll proceed without it
+                gradle_folder_path = None
+
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -314,6 +323,7 @@ class DeploymentMigration:
                 application_runtime_target,
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
+                gradle_folder_path=gradle_folder_path,
             )
         )
 
@@ -328,6 +338,7 @@ class DeploymentMigration:
             application_runtime_target,
             terraform_base_folder,
             dockerfile_path=dockerfile_path,
+            gradle_folder_path=gradle_folder_path,
         )
 
         self.file_handler.create_file(
@@ -589,6 +600,23 @@ class DeploymentMigration:
 
         return cwd.endswith("-aws")
 
+    def find_gradle_folder(self: Self) -> Path:
+        """Finds the gradle folder in the current folder"""
+        # TODO: Go trough all top level folders and check if they are gradle projects
+        #       If so, use that one instead of the one in the root folder
+        gradle_folders = [
+            folder
+            for folder in self.file_handler.get_subfolders(Path("."))
+            if self.file_handler.file_exists(str(folder / "gradlew"))
+        ]
+
+        if len(gradle_folders) == 0:
+            raise NotFoundError("Could not find a gradle folder")
+        elif len(gradle_folders) > 1:
+            raise NotFoundError("Found more than one gradle folder")
+        else:
+            return gradle_folders[0]
+
     def find_dockerfile(self) -> Path:
         """Finds the Dockerfile in the current folder"""
         locations = ["Dockerfile", "Docker/Dockerfile", "docker/Dockerfile"]
@@ -599,7 +627,9 @@ class DeploymentMigration:
 
         raise NotFoundError("Could not find a Dockerfile")
 
-    def initialize_github_environments(self, accounts: dict[str, str], repo_address: str) -> None:
+    def initialize_github_environments(
+        self, accounts: dict[str, str], repo_address: str
+    ) -> None:
         # This will create the environment if it doesn't exist
         self.github_api.ensure_authenticated()
         repo = repo_address.split("github.com/")[-1]
@@ -613,7 +643,10 @@ class DeploymentMigration:
 
             try:
                 self.github_api.add_variable_to_environment(
-                    repo=repo, environment=environment, name="AWS_ACCOUNT_ID", value=account_id
+                    repo=repo,
+                    environment=environment,
+                    name="AWS_ACCOUNT_ID",
+                    value=account_id,
                 )
             except Exception as e:
                 raise RuntimeError(
