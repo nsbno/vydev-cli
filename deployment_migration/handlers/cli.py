@@ -224,11 +224,14 @@ class CLIHandler:
             guessed_build_tool = self.deployment_migration.find_build_tool()
         except NotFoundError:
             guessed_build_tool = None
-        build_tool = Prompt.ask(
-            "Select the application build tool",
-            choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
-            default=guessed_build_tool,
-        )
+
+        build_tool = None
+        while not build_tool:
+            build_tool = Prompt.ask(
+                "Select the application build tool",
+                choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
+                default=guessed_build_tool,
+            )
 
         try:
             guessed_target_runtime = self.deployment_migration.find_aws_runtime(
