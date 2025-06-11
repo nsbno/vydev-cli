@@ -449,7 +449,7 @@ class DeploymentMigration:
             # Run git status --porcelain to check for uncommitted changes
             # If the output is empty, the repository is in a clean state
             result = subprocess.run(
-                ["git", "status", "--porcelain"],
+                ["git", "status", "-uno", "--porcelain"],
                 check=True,
                 capture_output=True,
                 text=True,
