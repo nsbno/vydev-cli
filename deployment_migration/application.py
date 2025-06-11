@@ -173,6 +173,25 @@ class ApplicationContext(abc.ABC):
         pass
 
 
+class GithubApi(abc.ABC):
+    @abc.abstractmethod
+    def ensure_authenticated(self: Self) -> None:
+        """Checks if the user is authenticated with GitHub CLI"""
+        pass
+
+    @abc.abstractmethod
+    def create_environment(self: Self, repo: str, environment: str) -> None:
+        """Creates a GitHub environment"""
+        pass
+
+    @abc.abstractmethod
+    def add_variable_to_environment(
+        self: Self, repo: str, environment: str, name: str, value: str
+    ) -> None:
+        """Adds a variable to a GitHub environment"""
+        pass
+
+
 class NotFoundError(Exception):
     pass
 
@@ -184,6 +203,7 @@ class DeploymentMigration:
     version_control: VersionControl
     file_handler: FileHandler
     github_actions_author: GithubActionsAuthor
+    github_api: GithubApi
     terraform: Terraform
     aws: AWS
     application_context: ApplicationContext
@@ -508,7 +528,7 @@ class DeploymentMigration:
 
     def help_with_github_environment_setup(
         self, environment_folders: list[Path]
-    ) -> tuple[str, dict[str, str]]:
+    ) -> tuple[str, str, dict[str, str]]:
         """Gives help for GitHub environment setup
 
         Manual at the moment
@@ -530,7 +550,7 @@ class DeploymentMigration:
         repo_address = self.version_control.get_origin()
         new_env_url = f"https://{repo_address}/settings/environments/new"
 
-        return new_env_url, account_ids
+        return new_env_url, repo_address, account_ids
 
     def remove_old_deployment_setup(self: Self) -> None:
         """Removes the old deployment setup"""
@@ -551,3 +571,24 @@ class DeploymentMigration:
         cwd = self.file_handler.current_folder_name()
 
         return cwd.endswith("-aws")
+
+    def initialize_github_environments(self, accounts: dict[str, str], repo_address: str) -> None:
+        # This will create the environment if it doesn't exist
+        self.github_api.ensure_authenticated()
+        repo = repo_address.split("github.com/")[-1]
+        for environment, account_id in accounts.items():
+            try:
+                self.github_api.create_environment(repo=repo, environment=environment)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to create GitHub environment '{environment}': {e}"
+                )
+
+            try:
+                self.github_api.add_variable_to_environment(
+                    repo=repo, environment=environment, name="AWS_ACCOUNT_ID", value=account_id
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to add AWS_ACCOUNT_ID variable to environment '{environment}': {e}"
+                )

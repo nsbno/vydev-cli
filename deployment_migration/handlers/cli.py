@@ -1,5 +1,5 @@
 """Command-line interface for the deployment migration application."""
-
+import shutil
 import sys
 import argparse
 from pathlib import Path
@@ -20,6 +20,7 @@ from deployment_migration.infrastructure.file_handler import (
 from deployment_migration.infrastructure.github_actions_author import (
     YAMLGithubActionsAuthor,
 )
+from deployment_migration.infrastructure.github_api import GithubApiImplementation
 from deployment_migration.infrastructure.parameter_store import (
     AWSAWS,
 )
@@ -167,7 +168,7 @@ class CLIHandler:
 
         # Guide the user through the environment setup process
         environment_folders = self.deployment_migration.find_all_environment_folders()
-        new_env_url, accounts = (
+        new_env_url, repo_address, accounts = (
             self.deployment_migration.help_with_github_environment_setup(
                 environment_folders
             )
@@ -243,19 +244,23 @@ class CLIHandler:
                 default=guessed_target_runtime,
             )
 
-        self.console.print("\n[bold]Please complete the following steps:[/bold]")
-        for env, account in accounts.items():
-            self.console.print(
-                f"Visit {new_env_url} to set up the following environment:"
-            )
-            self.console.print(f"   - [italic]Name[/italic]: {env}")
-            self.console.print(
-                f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
-            )
-            while not Confirm.ask("\nHave you created this environment in GH?"):
+        if shutil.which("gh"):
+            self.console.print("GitHub CLI is installed, using it to create GH environments.")
+            self.deployment_migration.initialize_github_environments(accounts, repo_address)
+        else:
+            self.console.print("\n[bold]Please complete the following steps:[/bold]")
+            for env, account in accounts.items():
                 self.console.print(
-                    "[bold red]Please complete the environment setup before continuing[/bold red]"
+                    f"Visit {new_env_url} to set up the following environment:"
                 )
+                self.console.print(f"   - [italic]Name[/italic]: {env}")
+                self.console.print(
+                    f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
+                )
+                while not Confirm.ask("\nHave you created this environment in GH?"):
+                    self.console.print(
+                        "[bold red]Please complete the environment setup before continuing[/bold red]"
+                    )
 
         # Upgrade terraform resources
         self.console.print(
@@ -351,6 +356,7 @@ def main():
         terraform_modifier = RegexTerraformModifier()
         version_control = GitVersionControl()
         application_context = ApplicationContextFinder()
+        github_api = GithubApiImplementation()
 
         # Create an instance of DeploymentMigration
         deployment_migration = DeploymentMigration(
@@ -360,6 +366,7 @@ def main():
             terraform=terraform_modifier,
             aws=parameter_store,
             application_context=application_context,
+            github_api=github_api
         )
 
     console.print(
