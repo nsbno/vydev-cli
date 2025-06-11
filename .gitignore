@@ -206,3 +206,5 @@ cython_debug/
 #.idea/
 
 .deployment
+*.tf
+*.yml
