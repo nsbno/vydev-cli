@@ -32,13 +32,9 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             }
 
             if gradle_folder_path and gradle_folder_path != ".":
-                build_with_params["with"] = {
-                    "working-directory": gradle_folder_path
-                }
+                build_with_params["with"] = {"working-directory": gradle_folder_path}
 
-            build_step = {
-                "build": build_with_params
-            }
+            build_step = {"build": build_with_params}
         elif build_tool == ApplicationBuildTool.PYTHON:
             build_step = {
                 "build": {
@@ -55,14 +51,14 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 "secrets": "inherit",
             }
 
-            if build_tool == ApplicationBuildTool.GRADLE and gradle_folder_path and gradle_folder_path != ".":
-                test_with_params["with"] = {
-                    "working-directory": gradle_folder_path
-                }
+            if (
+                build_tool == ApplicationBuildTool.GRADLE
+                and gradle_folder_path
+                and gradle_folder_path != "."
+            ):
+                test_with_params["with"] = {"working-directory": gradle_folder_path}
 
-            test_step = {
-                "test": test_with_params
-            }
+            test_step = {"test": test_with_params}
 
         if runtime_target == ApplicationRuntimeTarget.ECS:
             with_params = {
@@ -129,7 +125,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         }
 
         workflow: Dict[str, Any] = {
-            "name": "🔨 Pull Request 🔨",
+            "name": "Pull Request 🔨",
             "on": ["pull_request"],
             "jobs": jobs,
         }
@@ -186,7 +182,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         }
 
         workflow: Dict[str, Any] = {
-            "name": "🚀 Deployment 🚀",
+            "name": "Deployment 🚀",
             "on": {"push": {"branches": ["master", "main"]}},
             "jobs": jobs,
         }
