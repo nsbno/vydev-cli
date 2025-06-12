@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
@@ -164,6 +165,7 @@ class CLIHandler:
         """
         Handle the application repo upgrade operation.
         """
+        hr_line = Markdown("---")
         self.console.print(Panel("[bold]Upgrade Application Repo[/bold]"))
 
         # Guide the user through the environment setup process
@@ -198,8 +200,13 @@ class CLIHandler:
         except FileNotFoundError:
             terraform_folder = None
 
+        if terraform_folder is None:
+            self.console.print(
+                "[italic blue]Hint: [/italic blue]"
+                "[italic]Terraform infrastructure folder path is the parent directory of test, stage, service and prod[/italic]"
+            )
         terraform_folder_str = Prompt.ask(
-            "Enter the terraform infrastructure folder path",
+            "[bold]Enter the terraform infrastructure folder path[/bold]",
             default=terraform_folder,
         )
         terraform_folder = Path(terraform_folder_str)
@@ -211,13 +218,25 @@ class CLIHandler:
             )
         except NotFoundError:
             guessed_repository_name = None
+
+        self.console.print(hr_line)
+        if guessed_repository_name is None:
+            self.console.print(
+                "[italic blue]Hint: [/italic blue]"
+                "[italic]ECR repo name can be found in the Terraform configuration.[/italic]"
+            )
         repository_name = Prompt.ask(
-            "What is the name of the application's ECR Repository?",
+            "[bold]What is the name of the service's ECR Repository?[/bold]",
             default=guessed_repository_name,
         )
 
+        self.console.print(hr_line)
+        self.console.print(
+            "[italic blue]Hint: [/italic blue]"
+            "[italic]Service name can be found in the Terraform file where the ECS service or Lambda function is defined.[/italic]"
+        )
         application_name = Prompt.ask(
-            "What is the name of your application?",
+            "[bold]What is the service name?[/bold]"
         )
 
         try:
@@ -227,6 +246,7 @@ class CLIHandler:
 
         build_tool = None
         while build_tool is None:
+            self.console.print(hr_line)
             build_tool = Prompt.ask(
                 "Select the application build tool",
                 choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
@@ -241,12 +261,14 @@ class CLIHandler:
             guessed_target_runtime = None
         runtime_target = None
         while runtime_target is None:
+            self.console.print(hr_line)
             runtime_target = Prompt.ask(
                 "Select the application runtime target",
                 choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
                 default=guessed_target_runtime,
             )
 
+        self.console.print(hr_line)
         if shutil.which("gh"):
             self.console.print("GitHub CLI is installed, using it to create GH environments.")
             self.deployment_migration.initialize_github_environments(accounts, repo_address)
