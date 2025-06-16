@@ -8,9 +8,10 @@ class GithubApiImplementation(GithubApi):
     def _run_cmd(self, cmd: str, interactive=False) -> tuple[int, str, str]:
         if interactive:
             result = subprocess.run(cmd, shell=True)
+            return result.returncode, "", ""
         else:
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.returncode, getattr(result, "stdout", "").strip(), getattr(result, "stderr", "").strip()
+            return result.returncode, getattr(result, "stdout", "").strip(), getattr(result, "stderr", "").strip()
 
     def ensure_authenticated(self: Self) -> None:
         code, _, _ = self._run_cmd("gh auth status")
