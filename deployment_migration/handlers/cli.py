@@ -224,7 +224,7 @@ class CLIHandler:
         if guessed_repository_name is None:
             self.console.print(
                 "[italic blue]Hint: [/italic blue]"
-                "[italic]ECR repo name can be found in the Terraform configuration.[/italic]"
+                "[italic]ECR repo name may be found in the `service` environment of your -aws repo.[/italic]"
             )
         repository_name = Prompt.ask(
             "[bold]What is the name of the service's ECR Repository?[/bold]",
