@@ -1,5 +1,4 @@
 import pytest
-from typing import Dict, Any
 
 from deployment_migration.infrastructure.terraform_modifier import (
     RegexTerraformModifier,
@@ -167,7 +166,9 @@ def test_add_module_without_variables(terraform_modifier: RegexTerraformModifier
     assert "\n  var" not in result
 
 
-def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModifier, tmp_path):
+def test_has_module_finds_existing_module(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
     """Test that has_module returns True when a module with the specified source exists."""
     # Arrange
     terraform_config = """
@@ -189,7 +190,9 @@ def test_has_module_finds_existing_module(terraform_modifier: RegexTerraformModi
     assert result is True
 
 
-def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraformModifier, tmp_path):
+def test_has_module_finds_module_with_version(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
     """Test that has_module returns True when a module with the specified source and a version exists."""
     # Arrange
     terraform_config = """
@@ -211,7 +214,9 @@ def test_has_module_finds_module_with_version(terraform_modifier: RegexTerraform
     assert result is True
 
 
-def test_has_module_returns_false_when_module_not_found(terraform_modifier: RegexTerraformModifier, tmp_path):
+def test_has_module_returns_false_when_module_not_found(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
     """Test that has_module returns False when a module with the specified source does not exist."""
     # Arrange
     terraform_config = """
@@ -233,7 +238,9 @@ def test_has_module_returns_false_when_module_not_found(terraform_modifier: Rege
     assert result is False
 
 
-def test_find_module_returns_module_details(terraform_modifier: RegexTerraformModifier, tmp_path):
+def test_find_module_returns_module_details(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
     """Test that find_module returns the correct module details when a module with the specified source exists."""
     # Arrange
     terraform_config = """
@@ -265,7 +272,9 @@ def test_find_module_returns_module_details(terraform_modifier: RegexTerraformMo
     assert result["file_path"] == tf_file
 
 
-def test_find_module_returns_none_when_module_not_found(terraform_modifier: RegexTerraformModifier, tmp_path):
+def test_find_module_returns_none_when_module_not_found(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
     """Test that find_module returns None when a module with the specified source does not exist."""
     # Arrange
     terraform_config = """
@@ -287,7 +296,9 @@ def test_find_module_returns_none_when_module_not_found(terraform_modifier: Rege
     assert result is None
 
 
-def test_add_variable_adds_variables_to_existing_module(terraform_modifier: RegexTerraformModifier):
+def test_add_variable_adds_variables_to_existing_module(
+    terraform_modifier: RegexTerraformModifier,
+):
     """Test that add_variable adds variables to an existing module."""
     # Arrange
     terraform_config = """
@@ -312,7 +323,9 @@ def test_add_variable_adds_variables_to_existing_module(terraform_modifier: Rege
     assert "new_var3 = true" in result
 
 
-def test_add_variable_raises_error_when_module_not_found(terraform_modifier: RegexTerraformModifier):
+def test_add_variable_raises_error_when_module_not_found(
+    terraform_modifier: RegexTerraformModifier,
+):
     """Test that add_variable raises an error when the target module is not found."""
     # Arrange
     terraform_config = """
@@ -352,12 +365,20 @@ def test_add_test_listener_to_ecs_module(terraform_modifier: RegexTerraformModif
     metadata_module_name = "account_metadata"
 
     # Act
-    result = terraform_modifier.add_test_listener_to_ecs_module(terraform_config, metadata_module_name)
+    result = terraform_modifier.add_test_listener_to_ecs_module(
+        terraform_config, metadata_module_name
+    )
 
     # Assert
     assert 'module "github.com/nsbno/terraform-aws-ecs-service"' in result
-    assert 'source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"' in result
+    assert (
+        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"'
+        in result
+    )
     assert 'existing_var = "existing_value"' in result
-    assert 'lb_listeners = [{' in result
+    assert "lb_listeners = [{" in result
     assert 'listener_arn      = "some-listener-arn"' in result
-    assert 'test_listener_arn = "module.account_metadata.load_balancer.https_test_listener_arn"' in result
+    assert (
+        "test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
+        in result
+    )

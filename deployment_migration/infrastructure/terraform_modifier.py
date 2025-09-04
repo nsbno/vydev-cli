@@ -288,7 +288,7 @@ class RegexTerraformModifier(Terraform):
                 f"module.{metadata_module_name}.load_balancer.https_test_listener_arn"
             )
             # Insert test_listener_arn at the beginning of the lb_listeners content
-            modified_lb_listeners_content = f'\n    test_listener_arn = "{test_listener_value}"\n{lb_listeners_content}'
+            modified_lb_listeners_content = f"\n    test_listener_arn = {test_listener_value}\n{lb_listeners_content}"
 
             # Replace the lb_listeners content in the module
             # Make sure to include the closing brackets }] at the end
