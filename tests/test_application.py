@@ -1,3 +1,5 @@
+import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ from deployment_migration.application import (
     ApplicationContext,
     ApplicationRuntimeTarget,
     ApplicationBuildTool,
+    GithubApi,
 )
 
 
@@ -42,6 +45,11 @@ def parameter_store() -> AWS:
 
 
 @pytest.fixture
+def github_api():
+    return mock.Mock(spec=GithubApi)
+
+
+@pytest.fixture
 def application_context() -> ApplicationContext:
     return mock.Mock(spec=ApplicationContext)
 
@@ -54,6 +62,7 @@ def application(
     terraform_modifier,
     parameter_store,
     application_context,
+    github_api,
 ) -> DeploymentMigration:
     return DeploymentMigration(
         version_control=version_control,
@@ -62,6 +71,7 @@ def application(
         terraform=terraform_modifier,
         aws=parameter_store,
         application_context=application_context,
+        github_api=github_api,
     )
 
 
@@ -132,17 +142,28 @@ def test_creates_and_writes_github_action_deployment_workflow(
         {path: content}
     )
 
-    expected_file = "Never gonna give you up, never gonna let you down"
-    github_actions_author.create_deployment_workflow.return_value = expected_file
+    expected_deployment_file = "Never gonna give you up, never gonna let you down"
+    github_actions_author.create_deployment_workflow.return_value = (
+        expected_deployment_file
+    )
+
+    expected_pull_request_file = "Never gonna run around and desert you"
+    github_actions_author.create_pull_request_workflow.return_value = (
+        expected_pull_request_file
+    )
 
     application.create_github_action_deployment_workflow(
+        repository_name="test-app",
         application_name="test-app",
         application_build_tool=ApplicationBuildTool.PYTHON,
         application_runtime_target=ApplicationRuntimeTarget.LAMBDA,
         terraform_base_folder=Path("terraform"),
     )
 
-    assert created_files == {Path(".github/workflows/deploy.yml"): expected_file}
+    assert created_files == {
+        Path(".github/workflows/deploy.yml"): expected_deployment_file,
+        Path(".github/workflows/pull-request.yml"): expected_pull_request_file,
+    }
 
 
 def test_upgrades_aws_repo_terraform_resources(
@@ -175,13 +196,22 @@ def test_updates_and_writes_terraform_application_resources(
     file_handler: FileHandler,
     terraform_modifier: Terraform,
 ) -> None:
+    found_module = {
+        "github.com/nsbno/terraform-aws-account-metadata": {
+            "name": "account_metadata",
+        },
+    }
+
+    terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+        found_module[module]
+    )
+
     expected_file = "Never gonna give you up, never gonna let you down"
     terraform_modifier.add_module.side_effect = (
         lambda config, *args, **kwargs: config + expected_file
     )
 
     terraform_config = "We are no strangers to love\nYou know the rules and so do I\n"
-
     file_handler.read_file.return_value = terraform_config
 
     written_file = {}
@@ -201,15 +231,47 @@ def test_update_terraform_application_resources_updates_module_versions(
     application: DeploymentMigration,
     terraform_modifier: Terraform,
 ) -> None:
+    found_module = {
+        "github.com/nsbno/terraform-aws-account-metadata": {
+            "name": "account_metadata",
+        },
+    }
+    terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+        found_module[module]
+    )
+
+    application.upgrade_terraform_application_resources(
+        terraform_infrastructure_folder="infrastructure"
+    )
+
+    call: mock.call = terraform_modifier.mock_calls[1]
+    assert set(call.kwargs["target_modules"].keys()) == {
+        "github.com/nsbno/terraform-aws-ecs-service",
+        "github.com/nsbno/terraform-aws-lambda",
+        "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service",
+    }
+
+
+@pytest.mark.skip(reason="Not implemented yet")
+def test_updates_aws_provider_version_in_application(
+    application: DeploymentMigration,
+    terraform_modifier: Terraform,
+):
+    found_module = {
+        "github.com/nsbno/terraform-aws-account-metadata": {
+            "name": "account_metadata",
+        },
+    }
+    terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+        found_module[module]
+    )
+
     application.upgrade_terraform_application_resources(
         terraform_infrastructure_folder="infrastructure"
     )
 
     call: mock.call = terraform_modifier.mock_calls[0]
-    assert set(call.kwargs["target_modules"].keys()) == {
-        "github.com/nsbno/terraform-aws-ecs-service",
-        "github.com/nsbno/terraform-aws-lambda",
-    }
+    assert call.kwargs["variables"] == {"aws_provider_version": "~> 6.4.0"}
 
 
 def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
@@ -222,7 +284,17 @@ def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
         [],
     ]
 
-    result = application.find_all_environment_folders()
+    # Create a tempfile
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Store the current directory and CD into this temp dir
+        current_dir = os.getcwd()
+        os.chdir(temp_dir)
+
+        os.mkdir("terraform")
+
+        result = application.find_all_environment_folders()
+
+        os.chdir(current_dir)
 
     assert result == [Path("prod"), Path("staging"), Path("test")]
 

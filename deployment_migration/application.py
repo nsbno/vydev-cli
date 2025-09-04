@@ -323,7 +323,6 @@ class DeploymentMigration:
                 application_runtime_target,
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
-                gradle_folder_path=gradle_folder_path,
             )
         )
 
@@ -338,7 +337,6 @@ class DeploymentMigration:
             application_runtime_target,
             terraform_base_folder,
             dockerfile_path=dockerfile_path,
-            gradle_folder_path=gradle_folder_path,
         )
 
         self.file_handler.create_file(
