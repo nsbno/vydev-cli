@@ -236,9 +236,7 @@ class CLIHandler:
             "[italic blue]Hint: [/italic blue]"
             "[italic]Service name can be found in the Terraform file where the ECS service or Lambda function is defined.[/italic]"
         )
-        application_name = Prompt.ask(
-            "[bold]What is the service name?[/bold]"
-        )
+        application_name = Prompt.ask("[bold]What is the service name?[/bold]")
 
         try:
             guessed_build_tool = self.deployment_migration.find_build_tool()
@@ -295,6 +293,9 @@ class CLIHandler:
         # Upgrade terraform resources
         self.console.print(
             "[yellow]Upgrading application terraform resources...[/yellow]"
+        )
+        self.deployment_migration.upgrade_application_repo_terraform_provider_versions(
+            [str(v) for v in ([terraform_folder] + environment_folders)]
         )
         self.deployment_migration.upgrade_terraform_application_resources(
             str(terraform_folder)

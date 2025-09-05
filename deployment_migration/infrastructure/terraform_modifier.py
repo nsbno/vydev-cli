@@ -1,6 +1,4 @@
 import re
-import os
-import re
 from typing import Self, Any, Optional
 from pathlib import Path
 
@@ -9,6 +7,61 @@ from deployment_migration.application import Terraform, NotFoundError
 
 class RegexTerraformModifier(Terraform):
     """Implementation of TerraformModifyer that uses regex to modify Terraform files."""
+
+    def find_provider(
+        self: Self, module_source: str, terraform_folder: Path
+    ) -> Optional[dict[str, Any]]:
+        raise NotImplementedError("Not implemented yet")
+
+    def update_provider_versions(
+        self: Self,
+        terraform_config: str,
+        target_providers: dict[str, str],
+    ) -> str:
+        """
+        Update the versions of specified providers in a Terraform configuration.
+
+        :param terraform_config: The content of the Terraform file
+        :param target_providers: A dictionary where keys are provider names and values are the new versions
+        :return: The modified Terraform configuration with updated provider versions
+        """
+        modified_config = terraform_config
+        # Create pattern to match required_providers blocks
+        provider_block_pattern = r"required_providers\s+{[^}]*}"
+
+        # Check if required_providers block exists
+        required_providers_block = re.search(provider_block_pattern, modified_config)
+
+        if required_providers_block:
+            # If block exists, update provider versions within it
+            block_text = required_providers_block.group(0)
+            for provider_name, new_version in target_providers.items():
+                # Match provider configuration within required_providers block
+                provider_pattern = f'({provider_name}\\s*=\\s*{{[^}}]*version\\s*=\\s*)"[^"]*"([^}}]*}})'
+
+                # Update version while preserving formatting
+                updated_block = re.sub(
+                    provider_pattern, f'\\1"{new_version}"\\2', block_text
+                )
+
+                block_text = updated_block
+
+            # Replace old block with updated one
+            modified_config = modified_config.replace(
+                required_providers_block.group(0), block_text
+            )
+        else:
+            # If no required_providers block exists, create one
+            providers_text = "terraform {\n  required_providers {\n"
+            for provider_name, version in target_providers.items():
+                providers_text += (
+                    f'    {provider_name} = {{\n      version = "{version}"\n    }}\n'
+                )
+            providers_text += "  }\n}\n"
+
+            modified_config = providers_text + modified_config
+
+        return modified_config
 
     def find_account_id(self: Self, folder: str) -> str:
         """
@@ -257,7 +310,9 @@ class RegexTerraformModifier(Terraform):
         """
         # Find the ECS module in the config
         target_module_name = "github.com/nsbno/terraform-aws-ecs-service"
-        module_pattern = rf'module\s+"([^"]+)"\s+{{(.*?)}}(?=\s*(?:module|resource|data|provider|\Z))'
+        module_pattern = (
+            r'module\s+"([^"]+)"\s+{(.*?)}(?=\s*(?:module|resource|data|provider|\Z))'
+        )
 
         for module_match in re.finditer(module_pattern, terraform_config, re.DOTALL):
             module_name = module_match.group(1)

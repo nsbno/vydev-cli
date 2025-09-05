@@ -69,6 +69,21 @@ class VersionControl(abc.ABC):
 
 class Terraform(abc.ABC):
     @abc.abstractmethod
+    def find_provider(
+        self: Self, provider_name: str, terraform_folder: Path
+    ) -> dict[str, Any]:
+        """Finds a module in the terraform config"""
+        pass
+
+    @abc.abstractmethod
+    def update_provider_versions(
+        self: Self,
+        terraform_config: str,
+        target_providers: dict[str, str],
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
     def update_module_versions(
         self: Self,
         terraform_config: str,
@@ -439,6 +454,28 @@ class DeploymentMigration:
 
         return profile_names
 
+    def upgrade_application_repo_terraform_provider_versions(
+        self: Self,
+        folders: list[str],
+    ):
+        """Updates the provider versions in the AWS repo
+
+        :param folders: All folders with Terraform Config
+        """
+        for folder in folders:
+            provider_data = self.terraform.find_provider("aws", Path(folder))
+            if not provider_data:
+                continue
+
+            config = self.file_handler.read_file(provider_data["file"])
+            config = self.terraform.update_provider_versions(
+                config,
+                target_providers={
+                    "aws": "~> 6.4.0",
+                },
+            )
+            self.file_handler.overwrite_file(provider_data["file"], config)
+
     def upgrade_terraform_application_resources(
         self: Self,
         terraform_infrastructure_folder: str,
@@ -447,10 +484,10 @@ class DeploymentMigration:
         terraform_main_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
         terraform_config = self.file_handler.read_file(terraform_main_file_path)
 
-        updated_config = self.terraform.update_module_versions(
+        terraform_config = self.terraform.update_module_versions(
             terraform_config,
             target_modules={
-                "github.com/nsbno/terraform-aws-ecs-service": "2.0.0-beta1",
+                "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc3",
                 # TODO: This is not released yet
                 "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
                 "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",
@@ -467,22 +504,22 @@ class DeploymentMigration:
             )
             if not module_info:
                 module_name = "account_metadata"
-                updated_config = self.terraform.add_module(
+                terraform_config = self.terraform.add_module(
                     terraform_config,
                     name=module_name,
                     source="github.com/nsbno/terraform-aws-account-metadata",
-                    version="0.1.0",
+                    version="0.5.0",
                 )
             else:
                 module_name = module_info["name"]
 
             # We need to add a new variable for the test listener
-            updated_config = self.terraform.add_test_listener_to_ecs_module(
-                updated_config,
+            terraform_config = self.terraform.add_test_listener_to_ecs_module(
+                terraform_config,
                 metadata_module_name=module_name,
             )
 
-        self.file_handler.overwrite_file(terraform_main_file_path, updated_config)
+        self.file_handler.overwrite_file(terraform_main_file_path, terraform_config)
 
     def is_repo_in_clean_state(self) -> bool:
         """Checks if the Git repository is in a clean state

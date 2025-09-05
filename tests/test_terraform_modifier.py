@@ -382,3 +382,33 @@ def test_add_test_listener_to_ecs_module(terraform_modifier: RegexTerraformModif
         "test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
         in result
     )
+
+
+def test_update_provider_versions_replaces_existing_version(
+    terraform_modifier: RegexTerraformModifier,
+) -> None:
+    """Test that update_provider_versions replaces existing version constraints."""
+    # Arrange
+    terraform_config = """
+    terraform {
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = "~> 4.0.0"
+        }
+      }
+    }
+    """
+
+    target_providers = {"aws": "~> 6.4.0"}
+
+    # Act
+    result = terraform_modifier.update_provider_versions(
+        terraform_config, target_providers
+    )
+
+    assert 'version = "~> 6.4.0"' in result
+    assert 'version = "~> 4.0.0"' not in result
+    # Make sure that the amount of lines wasnt changed.
+    # Should be a good enough proxy that we didnt add anything.
+    assert len(result.splitlines()) == len(terraform_config.splitlines())

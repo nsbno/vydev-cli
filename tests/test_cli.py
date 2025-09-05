@@ -140,6 +140,7 @@ def test_upgrade_application_repo_success(
     mock_deployment_migration.upgrade_terraform_application_resources.assert_called_once_with(
         str(terraform_folder)
     )
+    mock_deployment_migration.upgrade_application_repo_terraform_provider_versions.assert_called_once()
     mock_deployment_migration.create_github_action_deployment_workflow.assert_called_once()
     mock_deployment_migration.remove_old_deployment_setup.assert_called_once()
 

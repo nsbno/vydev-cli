@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -220,7 +221,7 @@ def test_updates_and_writes_terraform_application_resources(
     )
 
     application.upgrade_terraform_application_resources(
-        terraform_infrastructure_folder="terraform"
+        terraform_infrastructure_folder="terraform",
     )
 
     file_to_modify = Path("terraform/main.tf")
@@ -241,10 +242,10 @@ def test_update_terraform_application_resources_updates_module_versions(
     )
 
     application.upgrade_terraform_application_resources(
-        terraform_infrastructure_folder="infrastructure"
+        terraform_infrastructure_folder="infrastructure",
     )
 
-    call: mock.call = terraform_modifier.mock_calls[1]
+    call: mock.call = terraform_modifier.mock_calls[0]
     assert set(call.kwargs["target_modules"].keys()) == {
         "github.com/nsbno/terraform-aws-ecs-service",
         "github.com/nsbno/terraform-aws-lambda",
@@ -252,26 +253,110 @@ def test_update_terraform_application_resources_updates_module_versions(
     }
 
 
-@pytest.mark.skip(reason="Not implemented yet")
-def test_updates_aws_provider_version_in_application(
-    application: DeploymentMigration,
-    terraform_modifier: Terraform,
-):
-    found_module = {
-        "github.com/nsbno/terraform-aws-account-metadata": {
-            "name": "account_metadata",
-        },
-    }
-    terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
-        found_module[module]
-    )
+class TestAWSProviderUpgrade:
+    @pytest.fixture(autouse=True)
+    def file_handler_data(self: Self, file_handler: FileHandler) -> dict[str, str]:
+        files = {
+            "infrastructure/versions.tf": "infrastructure_file",
+            "environments/test/versions.tf": "test_file",
+            "environments/prod/versions.tf": "prod_file",
+            "infrastructure/main.tf": "not relevant",
+        }
+        file_handler.read_file.side_effect = lambda path: files[str(path)]
 
-    application.upgrade_terraform_application_resources(
-        terraform_infrastructure_folder="infrastructure"
-    )
+        return files
 
-    call: mock.call = terraform_modifier.mock_calls[0]
-    assert call.kwargs["variables"] == {"aws_provider_version": "~> 6.4.0"}
+    @pytest.fixture(autouse=True)
+    def provider_locations(
+        self: Self,
+        terraform_modifier: Terraform,
+        file_handler_data: dict[str, str],
+    ) -> dict[str, str]:
+        found_provider_spec = {
+            f"{file_path.rsplit('/',1)[0]}": {
+                "aws": {"file": file_path},
+            }
+            for file_path in file_handler_data.keys()
+            if "main.tf" not in file_path
+        }
+        terraform_modifier.find_provider.side_effect = (
+            lambda provider, folder, *_, **__: (
+                found_provider_spec[str(folder)][provider]
+            )
+        )
+
+    @pytest.fixture(autouse=True)
+    def account_metadata_data(self: Self, terraform_modifier: Terraform) -> None:
+        found_module = {
+            "github.com/nsbno/terraform-aws-account-metadata": {
+                "name": "account_metadata",
+            },
+        }
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module[module]
+        )
+
+    def test_updates_aws_provider_version_in_application(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+    ):
+        application.upgrade_application_repo_terraform_provider_versions(
+            folders=[
+                "infrastructure",
+                "environments/prod",
+                "environments/test",
+            ]
+        )
+
+        for call in terraform_modifier.update_provider_versions.mock_calls:
+            assert call.kwargs["target_providers"] == {"aws": "~> 6.4.0"}
+
+    def test_uses_correct_provider_file_for_provider_upgrade(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler_data: dict[str, str],
+    ):
+        application.upgrade_application_repo_terraform_provider_versions(
+            folders=[
+                "infrastructure",
+                "environments/prod",
+                "environments/test",
+            ]
+        )
+
+        calls = terraform_modifier.update_provider_versions.mock_calls
+        call_content = [call.args[0] for call in calls]
+
+        for file, content in file_handler_data.items():
+            if "main.tf" in file:
+                continue
+            assert content in call_content
+
+    def test_updates_aws_provider_writes_file_back_to_filesystem(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler: FileHandler,
+        file_handler_data,
+    ):
+        application.upgrade_application_repo_terraform_provider_versions(
+            folders=[
+                "infrastructure",
+                "environments/prod",
+                "environments/test",
+            ]
+        )
+
+        files_written = [
+            call.args[0] for call in file_handler.overwrite_file.mock_calls
+        ]
+        expected_files = [
+            file_name for file_name in file_handler_data if "main.tf" not in file_name
+        ]
+
+        assert set(files_written) == set(expected_files)
 
 
 def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
