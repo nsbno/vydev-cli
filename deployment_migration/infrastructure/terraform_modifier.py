@@ -8,6 +8,65 @@ from deployment_migration.application import Terraform, NotFoundError
 class RegexTerraformModifier(Terraform):
     """Implementation of TerraformModifyer that uses regex to modify Terraform files."""
 
+    def remove_vydev_artifact_reference(
+        self: Self,
+        terraform_config: str,
+    ) -> str:
+        raise NotImplementedError("Not implemented yet")
+
+    def add_data_source(
+        self: Self,
+        terraform_config: str,
+        resource: str,
+        name: str,
+        variables: dict[str, str],
+    ) -> str:
+        """
+        Add a data source block to a Terraform configuration.
+
+        :param terraform_config: The content of the Terraform file
+        :param resource: The type of data source to add
+        :param name: The name of the data source
+        :param variables: Dictionary of variables to set in the data source
+        :return: The modified Terraform configuration with the new data source
+        """
+        # Start building the data source block
+        data_block = f'data "{resource}" "{name}" {{\n'
+
+        # Add variables to the block
+        for var_name, var_value in variables.items():
+            data_block += f'  {var_name} = "{var_value}"\n'
+
+        # Close the data block
+        data_block += "}\n"
+
+        # Append the new data source to the configuration
+        return terraform_config + "\n" + data_block
+
+    def replace_image_tag_on_ecs_module(
+        self: Self,
+        terraform_config: str,
+        ecr_repository_data_source_name: str,
+    ) -> str:
+        """
+        Replace image tag in ECS module configuration with reference to ECR repository.
+
+        :param ecr_repository_data_source_name: Name of the ECR repository data source
+        :return: The modified Terraform configuration with updated image tag
+        """
+        # Create pattern to find the ECS module block
+        module_pattern = r'module\s+"[^"]+"\s+{[^}]*source\s*=\s*"github\.com/nsbno/terraform-aws-ecs-service[^"]*"[^}]*}'
+
+        def replace_image(match):
+            module_text = match.group(0)
+            # Replace image line with reference to ECR repository
+            new_variable = f"\n  repository_url = data.aws_ecr_repository.{ecr_repository_data_source_name}.repository_url"
+            # Find and replace the image line
+            image_pattern = r'\s+image\s*=\s*"[^"]*"'
+            return re.sub(image_pattern, new_variable, module_text)
+
+        return re.sub(module_pattern, replace_image, terraform_config)
+
     def find_provider(
         self: Self, module_source: str, terraform_folder: Path
     ) -> Optional[dict[str, Any]]:

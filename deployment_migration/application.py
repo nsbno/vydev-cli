@@ -29,7 +29,7 @@ class FileHandler(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def folder_exists(self: Self, path: Path):
+    def folder_exists(self: Self, path: Path) -> Path | None:
         pass
 
     @abc.abstractmethod
@@ -80,6 +80,23 @@ class Terraform(abc.ABC):
         self: Self,
         terraform_config: str,
         target_providers: dict[str, str],
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def remove_vydev_artifact_reference(
+        self: Self,
+        terraform_config: str,
+    ) -> str:
+        pass
+
+    @abc.abstractmethod
+    def add_data_source(
+        self: Self,
+        terraform_config: str,
+        resource: str,
+        name: str,
+        variables: dict[str, str],
     ) -> str:
         pass
 
@@ -142,6 +159,13 @@ class Terraform(abc.ABC):
         self, type_: str, parameter: str, module_folder: Path
     ) -> list[str]:
         """Finds the value of a given datasource in the terraform folder"""
+        pass
+
+    @abc.abstractmethod
+    def replace_image_tag_on_ecs_module(
+        self: Self,
+        ecr_repository_data_source_name: str,
+    ):
         pass
 
 
@@ -475,6 +499,33 @@ class DeploymentMigration:
                 },
             )
             self.file_handler.overwrite_file(provider_data["file"], config)
+
+    def replace_image_with_ecr_repository_url(
+        self: Self,
+        terraform_infrastructure_folder: str,
+        repository_name: str,
+        service_account_id: str,
+    ):
+        terraform_main_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
+        terraform_config = self.file_handler.read_file(terraform_main_file_path)
+
+        terraform_config = self.terraform.add_data_source(
+            terraform_config,
+            "aws_ecr_repository",
+            name="this",
+            variables={
+                "name": repository_name,
+                "registry_id": service_account_id,
+            },
+        )
+
+        terraform_config = self.terraform.remove_vydev_artifact_reference(
+            terraform_config
+        )
+
+        terraform_config = self.terraform.replace_image_tag_on_ecs_module("this")
+
+        self.file_handler.overwrite_file(terraform_main_file_path, terraform_config)
 
     def upgrade_terraform_application_resources(
         self: Self,

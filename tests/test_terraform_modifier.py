@@ -1,5 +1,6 @@
 import pytest
 
+from deployment_migration.application import Terraform
 from deployment_migration.infrastructure.terraform_modifier import (
     RegexTerraformModifier,
 )
@@ -412,3 +413,53 @@ def test_update_provider_versions_replaces_existing_version(
     # Make sure that the amount of lines wasnt changed.
     # Should be a good enough proxy that we didnt add anything.
     assert len(result.splitlines()) == len(terraform_config.splitlines())
+
+
+def test_add_data_source_adds_datasource(terraform_modifier: Terraform) -> None:
+    terraform_config = "// A random comment\n"
+
+    resource_type = "aws_ecr_repository"
+    resource_name = "this"
+    variables = {"name": "test-repo", "registry_id": "23456789012"}
+
+    result = terraform_modifier.add_data_source(
+        terraform_config,
+        resource_type,
+        resource_name,
+        variables,
+    )
+
+    assert result == (
+        terraform_config
+        + "\n"
+        + f'data "{resource_type}" "{resource_name}" {{\n'
+        + f'  name = "{variables["name"]}"\n'
+        + f'  registry_id = "{variables["registry_id"]}"\n'
+        + "}\n"
+    )
+
+
+def test_replace_image_tag_on_ecs_module(terraform_modifier: Terraform) -> None:
+    terraform_config = (
+        'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"\n'
+        '  existing_var = "existing_value"\n'
+        '  image = "long long line with a lot of data"\n'
+        '  another_existing_var = "existing_value"\n'
+        "}"
+    )
+
+    result = terraform_modifier.replace_image_tag_on_ecs_module(
+        terraform_config, "this"
+    )
+
+    expected_config = (
+        'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"\n'
+        '  existing_var = "existing_value"\n'
+        "  repository_url = data.aws_ecr_repository.this.repository_url\n"
+        '  another_existing_var = "existing_value"\n'
+        "}"
+    )
+
+    assert result == expected_config

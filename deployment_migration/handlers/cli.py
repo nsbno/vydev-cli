@@ -300,6 +300,11 @@ class CLIHandler:
         self.deployment_migration.upgrade_terraform_application_resources(
             str(terraform_folder)
         )
+        self.deployment_migration.replace_image_with_ecr_repository_url(
+            str(terraform_folder),
+            repository_name,
+            accounts["Service"],
+        )
         self.console.print(
             "[green]Application terraform resources upgraded successfully![/green]"
         )

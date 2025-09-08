@@ -141,6 +141,7 @@ def test_upgrade_application_repo_success(
         str(terraform_folder)
     )
     mock_deployment_migration.upgrade_application_repo_terraform_provider_versions.assert_called_once()
+    mock_deployment_migration.replace_image_with_ecr_repository_url.assert_called_once()
     mock_deployment_migration.create_github_action_deployment_workflow.assert_called_once()
     mock_deployment_migration.remove_old_deployment_setup.assert_called_once()
 

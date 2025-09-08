@@ -359,6 +359,102 @@ class TestAWSProviderUpgrade:
         assert set(files_written) == set(expected_files)
 
 
+@pytest.mark.skip("Not Implemented")
+class TestUpgradeECSServiceProviderStrategy:
+    def test_ecs_service_provider_strategy_gets_upgraded(
+        self: Self,
+        application: DeploymentMigration,
+    ):
+        raise NotImplementedError()
+
+    def test_ecs_service_provider_strategy_upgrades_service_in_cluster(self):
+        raise NotImplementedError()
+
+
+class TestAddECRRepository:
+    @pytest.fixture(autouse=True)
+    def terraform_infra_folder(
+        self: Self,
+        file_handler: FileHandler,
+    ):
+        file_handler.folder_exists.return_value = True
+
+        return Path("infrastructure")
+
+    @pytest.fixture(autouse=True)
+    def always_find_aws_account_metadata_module(
+        self: Self,
+        terraform_modifier: Terraform,
+    ):
+        found_module = {
+            "github.com/nsbno/terraform-aws-account-metadata": {
+                "name": "account_metadata",
+            },
+        }
+
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module[module]
+        )
+
+    @pytest.fixture
+    def application_name(self: Self) -> str:
+        return "test-app"
+
+    @pytest.fixture
+    def service_account_id(self: Self) -> str:
+        return "23456789012"
+
+    def test_ecr_repository_data_source_is_added_when_not_present(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        application_name: str,
+        service_account_id: str,
+    ):
+        application.replace_image_with_ecr_repository_url(
+            "infrastructure", application_name, service_account_id
+        )
+
+        call = terraform_modifier.add_data_source.mock_calls[0]
+
+        assert call.args[1] == "aws_ecr_repository"
+        assert call.kwargs["name"] == "this"
+        assert call.kwargs["variables"] == {
+            "name": application_name,
+            "registry_id": service_account_id,
+        }
+
+    def test_removes_vydev_artifact_reference(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        application_name: str,
+        service_account_id: str,
+    ):
+        application.replace_image_with_ecr_repository_url(
+            "infrastructure", application_name, service_account_id
+        )
+
+        assert terraform_modifier.remove_vydev_artifact_reference.call_count == 1
+
+    def test_image_reference_on_ecs_service_is_updated_to_ecr_repository(
+        self: Self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        application_name: str,
+        service_account_id: str,
+    ):
+        application.replace_image_with_ecr_repository_url(
+            "infrastructure", application_name, service_account_id
+        )
+
+        assert terraform_modifier.replace_image_tag_on_ecs_module.call_count == 1
+        assert (
+            terraform_modifier.replace_image_tag_on_ecs_module.mock_calls[0].args[0]
+            == "this"
+        )
+
+
 def test_only_finds_environment_folders_in_terraform_infrastructure_folder(
     application: DeploymentMigration,
     file_handler: FileHandler,
