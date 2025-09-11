@@ -4,8 +4,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self, Any, Optional
 
-from tests.test_application import terraform_modifier
-
 
 class ApplicationBuildTool(StrEnum):
     PYTHON = "python"
