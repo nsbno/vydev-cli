@@ -72,7 +72,7 @@ class Terraform(abc.ABC):
     def find_provider(
         self: Self, provider_name: str, terraform_folder: Path
     ) -> dict[str, Any]:
-        """Finds a module in the terraform config"""
+        """Finds a provider in the terraform config"""
         pass
 
     @abc.abstractmethod
@@ -164,8 +164,9 @@ class Terraform(abc.ABC):
     @abc.abstractmethod
     def replace_image_tag_on_ecs_module(
         self: Self,
+        terraform_config: str,
         ecr_repository_data_source_name: str,
-    ):
+    ) -> str:
         pass
 
 
@@ -523,7 +524,9 @@ class DeploymentMigration:
             terraform_config
         )
 
-        terraform_config = self.terraform.replace_image_tag_on_ecs_module("this")
+        terraform_config = self.terraform.replace_image_tag_on_ecs_module(
+            terraform_config, "this"
+        )
 
         self.file_handler.overwrite_file(terraform_main_file_path, terraform_config)
 

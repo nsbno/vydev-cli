@@ -438,7 +438,7 @@ class TestAddECRRepository:
 
         assert terraform_modifier.replace_image_tag_on_ecs_module.call_count == 1
         assert (
-            terraform_modifier.replace_image_tag_on_ecs_module.mock_calls[0].args[0]
+            terraform_modifier.replace_image_tag_on_ecs_module.mock_calls[0].args[1]
             == "this"
         )
 

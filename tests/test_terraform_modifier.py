@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from deployment_migration.application import Terraform
@@ -383,6 +385,30 @@ def test_add_test_listener_to_ecs_module(terraform_modifier: RegexTerraformModif
         "test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
         in result
     )
+
+
+def test_find_providers_finds_the_correct_folder_with_providers(
+    terraform_modifier: RegexTerraformModifier,
+    tmp_path: Path,
+) -> None:
+    """Test that find_module returns None when a module with the specified source does not exist."""
+    terraform_config = """
+    terraform {
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = "~> 4.0.0"
+        }
+      }
+    }
+    """
+    tf_file = tmp_path / "versions.tf"
+    tf_file.write_text(terraform_config)
+
+    result = terraform_modifier.find_provider("aws", tmp_path)
+
+    assert result is not None
+    assert result["file"] == tf_file
 
 
 def test_update_provider_versions_replaces_existing_version(

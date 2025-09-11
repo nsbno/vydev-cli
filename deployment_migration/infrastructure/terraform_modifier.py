@@ -68,9 +68,48 @@ class RegexTerraformModifier(Terraform):
         return re.sub(module_pattern, replace_image, terraform_config)
 
     def find_provider(
-        self: Self, module_source: str, terraform_folder: Path
+        self: Self, target_provider: str, terraform_folder: Path
     ) -> Optional[dict[str, Any]]:
-        raise NotImplementedError("Not implemented yet")
+        """
+        Find a provider configuration in the Terraform files.
+
+        :param target_provider: The name of the provider to find
+        :param terraform_folder: The folder path containing Terraform files
+        :return: Dictionary with provider details if found, None otherwise
+        """
+        # Create a pattern to match required_providers blocks and capture provider details
+        provider_pattern = (
+            rf"required_providers\s+{{\s*[^}}]*{target_provider}\s*=\s*{{\s*([^}}]*)}}"
+        )
+
+        # Read all .tf files from the terraform folder
+        tf_files = terraform_folder.glob("**/*.tf")
+        for tf_file in tf_files:
+            with open(tf_file, "r") as f:
+                content = f.read()
+                # Search for the pattern in the terraform config
+                match = re.search(provider_pattern, content, re.DOTALL)
+                if match:
+                    provider_block = match.group(1)
+
+                    # Extract version from the provider block
+                    version_match = re.search(
+                        r'version\s*=\s*"([^"]*)"', provider_block
+                    )
+                    version = version_match.group(1) if version_match else None
+
+                    # Extract source if present
+                    source_match = re.search(r'source\s*=\s*"([^"]*)"', provider_block)
+                    source = source_match.group(1) if source_match else None
+
+                    return {
+                        "name": target_provider,
+                        "version": version,
+                        "source": source,
+                        "file": Path(tf_file),
+                    }
+
+        return None
 
     def update_provider_versions(
         self: Self,
