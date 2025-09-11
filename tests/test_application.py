@@ -250,6 +250,7 @@ def test_update_terraform_application_resources_updates_module_versions(
         "github.com/nsbno/terraform-aws-ecs-service",
         "github.com/nsbno/terraform-aws-lambda",
         "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service",
+        "github.com/nsbno/terraform-aws-account-metadata",
     }
 
 

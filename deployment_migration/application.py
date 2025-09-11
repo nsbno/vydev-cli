@@ -4,6 +4,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self, Any, Optional
 
+from tests.test_application import terraform_modifier
+
 
 class ApplicationBuildTool(StrEnum):
     PYTHON = "python"
@@ -545,6 +547,7 @@ class DeploymentMigration:
                 # TODO: This is not released yet
                 "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
                 "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",
+                "github.com/nsbno/terraform-aws-account-metadata": "0.5.0",
             },
         )
 
