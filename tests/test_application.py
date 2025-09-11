@@ -359,18 +359,6 @@ class TestAWSProviderUpgrade:
         assert set(files_written) == set(expected_files)
 
 
-@pytest.mark.skip("Not Implemented")
-class TestUpgradeECSServiceProviderStrategy:
-    def test_ecs_service_provider_strategy_gets_upgraded(
-        self: Self,
-        application: DeploymentMigration,
-    ):
-        raise NotImplementedError()
-
-    def test_ecs_service_provider_strategy_upgrades_service_in_cluster(self):
-        raise NotImplementedError()
-
-
 class TestAddECRRepository:
     @pytest.fixture(autouse=True)
     def terraform_infra_folder(
