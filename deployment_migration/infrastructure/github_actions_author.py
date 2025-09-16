@@ -135,6 +135,23 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         return yaml_string
 
+    def _upload_openapi_spec_workflow_job(
+        self,
+        application_name: str,
+        open_api_spec_path: str,
+    ) -> dict[str, Any]:
+        return {
+            "upload-openapi-spec": {
+                "uses": self._workflow("helpers", "upload-openapi-spec", "main"),
+                "needs": ["build"],
+                "secrets": "inherit",
+                "with": {
+                    "application-name": application_name,
+                    "open-api-spec-path": open_api_spec_path,
+                },
+            }
+        }
+
     def create_deployment_workflow(
         self: Self,
         repository_name: str,
@@ -144,6 +161,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         terraform_base_folder: Path,
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
+        open_api_spec_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -168,6 +186,13 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 gradle_folder_path=gradle_folder_path,
             ),
         }
+
+        if open_api_spec_path:
+            jobs.update(
+                self._upload_openapi_spec_workflow_job(
+                    application_name, open_api_spec_path
+                )
+            )
 
         # Add the deploy job with dynamic needs
         jobs["deploy"] = {

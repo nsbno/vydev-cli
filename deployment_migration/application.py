@@ -4,6 +4,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self, Any, Optional
 
+import yaml
+
 
 class ApplicationBuildTool(StrEnum):
     PYTHON = "python"
@@ -192,6 +194,7 @@ class GithubActionsAuthor(abc.ABC):
         terraform_base_folder: Path,
         dockerfile_path: str = None,
         gradle_file_path: str = None,
+        openapi_spec_path: str = None,
     ) -> str:
         pass
 
@@ -329,6 +332,25 @@ class DeploymentMigration:
 
         return stripped_folders
 
+    def _find_openapi_spec(self) -> Path | None:
+        circle_ci_config_file = self.file_handler.read_file(
+            Path(".circleci/config.yml")
+        )
+        circle_ci_config = yaml.safe_load(circle_ci_config_file)
+
+        try:
+            push_api_spec_job = next(
+                job
+                for workflow in circle_ci_config["workflow"]
+                for job in workflow["jobs"]
+                if "documentation/push-api-spec" in job
+            )
+        except StopIteration:
+            return None
+
+        path = push_api_spec_job["documentation/push-api-spec"]["openapi-path"]
+        return Path(path)
+
     def create_github_action_deployment_workflow(
         self: Self,
         repository_name: str,
@@ -355,6 +377,12 @@ class DeploymentMigration:
                 # If Gradle folder is not found, we'll proceed without it
                 gradle_folder_path = None
 
+        # TODO: Find OpenAPI Spec if we have a OpenAPI Spec
+        try:
+            openapi_spec_path = str(self._find_openapi_spec())
+        except NotFoundError:
+            openapi_spec_path = None
+
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -363,6 +391,7 @@ class DeploymentMigration:
                 application_runtime_target,
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
+                openapi_spec_path=str(openapi_spec_path),
             )
         )
 

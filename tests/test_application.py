@@ -142,6 +142,7 @@ def test_creates_and_writes_github_action_deployment_workflow(
     file_handler.create_file.side_effect = lambda path, content: created_files.update(
         {path: content}
     )
+    file_handler.read_file.return_value = "workflow: []"
 
     expected_deployment_file = "Never gonna give you up, never gonna let you down"
     github_actions_author.create_deployment_workflow.return_value = (
