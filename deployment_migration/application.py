@@ -341,7 +341,7 @@ class DeploymentMigration:
         try:
             push_api_spec_job = next(
                 job
-                for workflow in circle_ci_config["workflows"]
+                for workflow in circle_ci_config["workflows"].values()
                 for job in workflow["jobs"]
                 if "documentation/push-api-spec" in job
             )
