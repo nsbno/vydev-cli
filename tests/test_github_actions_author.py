@@ -136,7 +136,7 @@ def test_create_deployment_workflow_includes_open_api_upload_if_present(
         application_build_tool=application_build_tool,
         application_runtime_target=application_runtime_target,
         terraform_base_folder=terraform_base_folder,
-        open_api_spec_path=openapi_yaml,
+        openapi_spec_path=openapi_yaml,
     )
 
     workflow_dict = yaml.safe_load(result)

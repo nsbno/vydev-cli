@@ -161,7 +161,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         terraform_base_folder: Path,
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
-        open_api_spec_path: str = None,
+        openapi_spec_path: str = None,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -187,10 +187,10 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             ),
         }
 
-        if open_api_spec_path:
+        if openapi_spec_path:
             jobs.update(
                 self._upload_openapi_spec_workflow_job(
-                    application_name, open_api_spec_path
+                    application_name, openapi_spec_path
                 )
             )
 
