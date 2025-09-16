@@ -12,7 +12,16 @@ class RegexTerraformModifier(Terraform):
         self: Self,
         terraform_config: str,
     ) -> str:
-        raise NotImplementedError("Not implemented yet")
+        """
+        Remove data source blocks that start with "vydev" from Terraform configuration.
+
+        :param terraform_config: The content of the Terraform file
+        :return: The modified Terraform configuration with vydev data sources removed
+        """
+        vydev_pattern = r'data\s+"vydev_artifact_version"\s+"[^"]*"\s+{[^}]*}'
+
+        # Remove all matching data blocks
+        return re.sub(vydev_pattern, "", terraform_config)
 
     def add_data_source(
         self: Self,
