@@ -549,9 +549,9 @@ class DeploymentMigration:
             },
         )
 
-        terraform_config = self.terraform.remove_vydev_artifact_reference(
-            terraform_config
-        )
+        # terraform_config = self.terraform.remove_vydev_artifact_reference(
+        #     terraform_config
+        # )
 
         terraform_config = self.terraform.replace_image_tag_on_ecs_module(
             terraform_config, "this"
