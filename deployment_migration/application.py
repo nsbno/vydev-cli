@@ -195,6 +195,7 @@ class GithubActionsAuthor(abc.ABC):
         dockerfile_path: str = None,
         gradle_file_path: str = None,
         openapi_spec_path: str = None,
+        skip_service_environment: bool = False,
     ) -> str:
         pass
 
@@ -207,6 +208,7 @@ class GithubActionsAuthor(abc.ABC):
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
         dockerfile_path: str = None,
+        skip_service_environment: bool = False,
     ) -> str:
         pass
 
@@ -300,6 +302,14 @@ class DeploymentMigration:
 
         return folder
 
+    def has_service_environment(self: Self) -> bool:
+        """Check if the repository has a service environment folder"""
+        try:
+            self.find_terraform_environment_folder("service")
+            return True
+        except FileNotFoundError:
+            return False
+
     def find_all_environment_folders(self: Self) -> list[Path]:
         """Finds all terraform environment folders"""
         potential_folder_locations = [
@@ -388,6 +398,9 @@ class DeploymentMigration:
         except NotFoundError:
             openapi_spec_path = None
 
+        # Check if service environment exists
+        skip_service_environment = not self.has_service_environment()
+
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -397,6 +410,7 @@ class DeploymentMigration:
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
                 openapi_spec_path=openapi_spec_path,
+                skip_service_environment=skip_service_environment,
             )
         )
 
@@ -411,6 +425,7 @@ class DeploymentMigration:
             application_runtime_target,
             terraform_base_folder,
             dockerfile_path=dockerfile_path,
+            skip_service_environment=skip_service_environment,
         )
 
         self.file_handler.create_file(

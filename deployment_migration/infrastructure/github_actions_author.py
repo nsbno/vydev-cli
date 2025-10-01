@@ -106,6 +106,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         terraform_base_folder: Path,
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
+        skip_service_environment: bool = False,
     ) -> str:
         """
         Create a GitHub Actions pull request workflow for the application.
@@ -119,10 +120,15 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         )
         jobs.pop("package")
 
-        jobs["terraform-plan"] = {
+        terraform_plan_job = {
             "uses": self._workflow("helpers", "terraform-plan", "v1"),
             "secrets": "inherit",
         }
+
+        if skip_service_environment:
+            terraform_plan_job["with"] = {"skip-service-environment": True}
+
+        jobs["terraform-plan"] = terraform_plan_job
 
         workflow: Dict[str, Any] = {
             "name": "Pull Request 🔨",
@@ -162,6 +168,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
         openapi_spec_path: str = None,
+        skip_service_environment: bool = False,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -171,13 +178,19 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         :param application_runtime_target: The runtime target for the application (LAMBDA or ECS)
         :param terraform_base_folder: The base folder for Terraform configuration
         :param dockerfile_path: The path to the Dockerfile to use for building the Docker image
+        :param skip_service_environment: If True, skip service environment in deployments
         :return: The GitHub Actions workflow as a YAML string
         """
+        terraform_changes_job = {
+            "uses": self._workflow("helpers.find-changes", "terraform", "v1"),
+            "secrets": "inherit",
+        }
+
+        if skip_service_environment:
+            terraform_changes_job["with"] = {"skip-service-environment": True}
+
         jobs = {
-            "terraform-changes": {
-                "uses": self._workflow("helpers.find-changes", "terraform", "v1"),
-                "secrets": "inherit",
-            },
+            "terraform-changes": terraform_changes_job,
             **self._build_and_package(
                 repository_name,
                 application_build_tool,
@@ -195,15 +208,20 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             )
 
         # Add the deploy job with dynamic needs
+        deploy_with = {
+            "applications": application_name,
+            "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
+        }
+
+        if skip_service_environment:
+            deploy_with["skip-service-environment"] = True
+
         jobs["deploy"] = {
             "needs": [name for name in jobs.keys()],
             "uses": self._workflow("deployment", "all-environments", "v1"),
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure') && success()",
-            "with": {
-                "applications": application_name,
-                "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
-            },
+            "with": deploy_with,
         }
 
         workflow: Dict[str, Any] = {

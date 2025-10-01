@@ -541,11 +541,7 @@ def test_find_openapi_spec_returns_none_when_circleci_config_exists_without_spec
 ) -> None:
     """Test _find_openapi_spec returns None when config exists without OpenAPI spec."""
     circleci_config = (
-        "workflows:\n"
-        "  deploy:\n"
-        "    jobs:\n"
-        "      - build\n"
-        "      - test\n"
+        "workflows:\n" "  deploy:\n" "    jobs:\n" "      - build\n" "      - test\n"
     )
     file_handler.read_file.return_value = circleci_config
 
@@ -594,8 +590,8 @@ def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
         "}\n"
     )
     file_handler.read_file.return_value = service_tf_content
-    terraform_modifier.update_module_versions.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+    terraform_modifier.update_module_versions.return_value = service_tf_content.replace(
+        "2.0.0", "3.0.0-rc3"
     )
     terraform_modifier.add_test_listener_to_ecs_module.return_value = (
         service_tf_content.replace("2.0.0", "3.0.0-rc3")
@@ -642,7 +638,7 @@ def test_replace_image_with_ecr_when_ecs_in_separate_file(
     terraform_modifier.replace_image_tag_on_ecs_module.return_value = (
         'data "aws_ecr_repository" "this" {}\n'
         'module "ecs_service" {\n'
-        '  repository_url = data.aws_ecr_repository.this.repository_url\n'
+        "  repository_url = data.aws_ecr_repository.this.repository_url\n"
         "}\n"
     )
 
@@ -679,8 +675,8 @@ def test_upgrade_aws_repo_when_oidc_module_in_separate_file(
         "}\n"
     )
     file_handler.read_file.return_value = github_tf_content
-    terraform_modifier.update_module_versions.return_value = (
-        github_tf_content.replace("0.0.1", "0.1.0")
+    terraform_modifier.update_module_versions.return_value = github_tf_content.replace(
+        "0.0.1", "0.1.0"
     )
 
     written_files = {}
@@ -786,3 +782,156 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     assert "3.0.0-rc3" in written_files[Path("terraform/template/ecs.tf")]
     assert "2.0.0-beta1" in written_files[Path("terraform/template/lambda.tf")]
     assert "0.5.0" in written_files[Path("terraform/template/main.tf")]
+
+
+class TestServiceEnvironmentDetection:
+    """Tests for detecting presence of service environment folder"""
+
+    def test_has_service_environment_returns_true_when_service_folder_exists(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Service folder exists at terraform/service/"""
+        file_handler.folder_exists.side_effect = lambda path: path == Path(
+            "terraform/service/"
+        )
+
+        result = application.has_service_environment()
+
+        assert result is True
+
+    def test_has_service_environment_returns_false_when_service_folder_missing(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Service folder does not exist - only test and prod"""
+        file_handler.folder_exists.return_value = False
+
+        result = application.has_service_environment()
+
+        assert result is False
+
+    def test_has_service_environment_checks_alternative_locations(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Service folder exists at environments/service/"""
+        file_handler.folder_exists.side_effect = lambda path: path == Path(
+            "environments/service/"
+        )
+
+        result = application.has_service_environment()
+
+        assert result is True
+
+
+class TestWorkflowGenerationWithServiceFlag:
+    """Tests for skip-service-environment flag in workflow generation"""
+
+    def test_deployment_workflow_includes_skip_flag_when_no_service_folder(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """Generated workflow should include skip-service-environment flag"""
+        # No service folder exists
+        file_handler.folder_exists.return_value = False
+        # Mock openapi spec detection to raise FileNotFoundError (no .circleci folder)
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_deployment_workflow.return_value = (
+            "name: Deploy\n"
+            "jobs:\n"
+            "  terraform-changes:\n"
+            "    with:\n"
+            "      skip-service-environment: true\n"
+        )
+        github_actions_author.create_pull_request_workflow.return_value = (
+            "name: PR\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+        )
+
+        application.create_github_action_deployment_workflow(
+            repository_name="my-repo",
+            application_name="my-app",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify the workflow generator was called with skip flag
+        github_actions_author.create_deployment_workflow.assert_called_once()
+        call_kwargs = github_actions_author.create_deployment_workflow.call_args.kwargs
+        assert call_kwargs.get("skip_service_environment") is True
+
+    def test_deployment_workflow_omits_skip_flag_when_service_folder_exists(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """Generated workflow should NOT include skip flag when service exists"""
+        # Service folder exists
+        file_handler.folder_exists.side_effect = lambda path: path == Path(
+            "terraform/service/"
+        )
+        # Mock openapi spec detection to raise FileNotFoundError (no .circleci folder)
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_deployment_workflow.return_value = (
+            "name: Deploy\njobs:\n  terraform-changes:\n    uses: ...\n"
+        )
+        github_actions_author.create_pull_request_workflow.return_value = (
+            "name: PR\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+        )
+
+        application.create_github_action_deployment_workflow(
+            repository_name="my-repo",
+            application_name="my-app",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify the workflow generator was called without skip flag (or False)
+        github_actions_author.create_deployment_workflow.assert_called_once()
+        call_kwargs = github_actions_author.create_deployment_workflow.call_args.kwargs
+        skip_flag = call_kwargs.get("skip_service_environment", False)
+        assert skip_flag is False
+
+    def test_pull_request_workflow_includes_skip_flag_when_no_service_folder(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """PR workflow should also get the skip flag"""
+        # No service folder exists
+        file_handler.folder_exists.return_value = False
+        # Mock openapi spec detection to raise FileNotFoundError (no .circleci folder)
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_pull_request_workflow.return_value = (
+            "name: PR\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+        )
+        github_actions_author.create_deployment_workflow.return_value = (
+            "name: Deploy\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n"
+        )
+
+        application.create_github_action_deployment_workflow(
+            repository_name="my-repo",
+            application_name="my-app",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify PR workflow generator was called with skip flag
+        github_actions_author.create_pull_request_workflow.assert_called_once()
+        call_kwargs = (
+            github_actions_author.create_pull_request_workflow.call_args.kwargs
+        )
+        assert call_kwargs.get("skip_service_environment") is True
