@@ -27,7 +27,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     ) -> dict[str, Any]:
         if build_tool == ApplicationBuildTool.GRADLE:
             build_with_params = {
-                "uses": self._workflow("build", "gradle", "main"),
+                "uses": self._workflow("build", "gradle", "v1"),
                 "secrets": "inherit",
             }
 
@@ -38,7 +38,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         elif build_tool == ApplicationBuildTool.PYTHON:
             build_step = {
                 "build": {
-                    "uses": self._workflow("build", build_tool, "main"),
+                    "uses": self._workflow("build", build_tool, "v1"),
                 }
             }
         else:
@@ -47,7 +47,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         test_step = {}
         if add_tests:
             test_with_params = {
-                "uses": self._workflow("test", "gradle", "main"),
+                "uses": self._workflow("test", "gradle", "v1"),
                 "secrets": "inherit",
             }
 
@@ -72,7 +72,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
             package_step = {
                 "package": {
-                    "uses": self._workflow("package", "docker", "main"),
+                    "uses": self._workflow("package", "docker", "v1"),
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": with_params,
@@ -82,7 +82,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             package_step = {
                 "package": {
                     "needs": ["build", *(["test"] if add_tests else [])],
-                    "uses": self._workflow("package", "s3", "main"),
+                    "uses": self._workflow("package", "s3", "v1"),
                     "secrets": "inherit",
                     "with": {
                         "repo-name": repository_name,
@@ -120,7 +120,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         jobs.pop("package")
 
         jobs["terraform-plan"] = {
-            "uses": self._workflow("helpers", "terraform-plan", "main"),
+            "uses": self._workflow("helpers", "terraform-plan", "v1"),
             "secrets": "inherit",
         }
 
@@ -142,7 +142,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     ) -> dict[str, Any]:
         return {
             "upload-openapi-spec": {
-                "uses": self._workflow("helpers", "upload-openapi-spec", "main"),
+                "uses": self._workflow("helpers", "upload-openapi-spec", "v1"),
                 "needs": ["build"],
                 "secrets": "inherit",
                 "with": {
@@ -175,7 +175,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         """
         jobs = {
             "terraform-changes": {
-                "uses": self._workflow("helpers.find-changes", "terraform", "main"),
+                "uses": self._workflow("helpers.find-changes", "terraform", "v1"),
                 "secrets": "inherit",
             },
             **self._build_and_package(
@@ -197,7 +197,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         # Add the deploy job with dynamic needs
         jobs["deploy"] = {
             "needs": [name for name in jobs.keys()],
-            "uses": self._workflow("deployment", "all-environments", "main"),
+            "uses": self._workflow("deployment", "all-environments", "v1"),
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure') && success()",
             "with": {
