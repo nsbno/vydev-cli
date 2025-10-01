@@ -482,3 +482,62 @@ def test_remove_old_deployment_setup(
     assert file_handler.delete_folder.call_count == 2
     file_handler.delete_folder.assert_any_call(Path(".deployment"), not_found_ok=True)
     file_handler.delete_folder.assert_any_call(Path(".circleci"), not_found_ok=True)
+
+
+def test_find_openapi_spec_returns_path_when_circleci_config_exists_with_spec(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test _find_openapi_spec returns OpenAPI spec path from .circleci/config.yml."""
+    circleci_config = (
+        "workflows:\n"
+        "  deploy:\n"
+        "    jobs:\n"
+        "      - documentation/push-api-spec:\n"
+        '          openapi-path: "src/main/resources/openapi.yaml"\n'
+    )
+    file_handler.read_file.return_value = circleci_config
+
+    result = application._find_openapi_spec()
+
+    assert result == Path("src/main/resources/openapi.yaml")
+    file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))
+
+
+def test_find_openapi_spec_returns_none_when_circleci_config_exists_without_spec(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test _find_openapi_spec returns None when config exists without OpenAPI spec."""
+    circleci_config = (
+        "workflows:\n"
+        "  deploy:\n"
+        "    jobs:\n"
+        "      - build\n"
+        "      - test\n"
+    )
+    file_handler.read_file.return_value = circleci_config
+
+    result = application._find_openapi_spec()
+
+    assert result is None
+    file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))
+
+
+def test_find_openapi_spec_returns_none_when_circleci_folder_does_not_exist(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test _find_openapi_spec returns None when .circleci folder doesn't exist.
+
+    Instead of crashing with FileNotFoundError, the method should return None
+    to allow the migration to continue gracefully.
+    """
+    file_handler.read_file.side_effect = FileNotFoundError(
+        ".circleci/config.yml not found"
+    )
+
+    result = application._find_openapi_spec()
+
+    assert result is None
+    file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))

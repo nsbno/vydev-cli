@@ -333,9 +333,14 @@ class DeploymentMigration:
         return stripped_folders
 
     def _find_openapi_spec(self) -> Path | None:
-        circle_ci_config_file = self.file_handler.read_file(
-            Path(".circleci/config.yml")
-        )
+        try:
+            circle_ci_config_file = self.file_handler.read_file(
+                Path(".circleci/config.yml")
+            )
+        except FileNotFoundError:
+            # No .circleci folder - skip OpenAPI spec detection
+            return None
+
         circle_ci_config = yaml.safe_load(circle_ci_config_file)
 
         try:
@@ -377,9 +382,9 @@ class DeploymentMigration:
                 # If Gradle folder is not found, we'll proceed without it
                 gradle_folder_path = None
 
-        # TODO: Find OpenAPI Spec if we have a OpenAPI Spec
         try:
-            openapi_spec_path = str(self._find_openapi_spec())
+            openapi_spec = self._find_openapi_spec()
+            openapi_spec_path = str(openapi_spec) if openapi_spec else None
         except NotFoundError:
             openapi_spec_path = None
 
@@ -391,7 +396,7 @@ class DeploymentMigration:
                 application_runtime_target,
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
-                openapi_spec_path=str(openapi_spec_path),
+                openapi_spec_path=openapi_spec_path,
             )
         )
 
