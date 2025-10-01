@@ -177,6 +177,8 @@ def test_upgrades_aws_repo_terraform_resources(
     terraform_modifier.add_module.side_effect = (
         lambda config, *args, **kwargs: config + expected_file
     )
+    # Mock find_module to return None (module doesn't exist yet)
+    terraform_modifier.find_module.return_value = None
 
     terraform_config = "We are no strangers to love\nYou know the rules and so do I\n"
 
@@ -199,13 +201,20 @@ def test_updates_and_writes_terraform_application_resources(
     terraform_modifier: Terraform,
 ) -> None:
     found_module = {
+        "github.com/nsbno/terraform-aws-ecs-service": {
+            "name": "ecs",
+            "file_path": Path("terraform/main.tf"),
+        },
+        "github.com/nsbno/terraform-aws-lambda": None,
         "github.com/nsbno/terraform-aws-account-metadata": {
             "name": "account_metadata",
+            "file_path": Path("terraform/main.tf"),
         },
+        "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": None,
     }
 
     terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
-        found_module[module]
+        found_module.get(module)
     )
 
     expected_file = "Never gonna give you up, never gonna let you down"
@@ -234,23 +243,41 @@ def test_update_terraform_application_resources_updates_module_versions(
     terraform_modifier: Terraform,
 ) -> None:
     found_module = {
+        "github.com/nsbno/terraform-aws-ecs-service": {
+            "name": "ecs",
+            "file_path": Path("terraform/main.tf"),
+        },
+        "github.com/nsbno/terraform-aws-lambda": None,
         "github.com/nsbno/terraform-aws-account-metadata": {
             "name": "account_metadata",
+            "file_path": Path("terraform/main.tf"),
         },
+        "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": None,
     }
     terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
-        found_module[module]
+        found_module.get(module)
     )
 
     application.upgrade_terraform_application_resources(
         terraform_infrastructure_folder="infrastructure",
     )
 
-    call: mock.call = terraform_modifier.mock_calls[0]
-    assert set(call.kwargs["target_modules"].keys()) == {
+    # With new multi-file design, update_module_versions is called once per module
+    # Collect all modules that were updated
+    update_calls = [
+        call
+        for call in terraform_modifier.mock_calls
+        if call[0] == "update_module_versions"
+    ]
+
+    # Get all modules that were attempted to be updated
+    updated_modules = set()
+    for call in update_calls:
+        updated_modules.update(call.kwargs["target_modules"].keys())
+
+    # Only modules that exist (have file_path) should be updated
+    assert updated_modules == {
         "github.com/nsbno/terraform-aws-ecs-service",
-        "github.com/nsbno/terraform-aws-lambda",
-        "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service",
         "github.com/nsbno/terraform-aws-account-metadata",
     }
 
@@ -377,13 +404,17 @@ class TestAddECRRepository:
         terraform_modifier: Terraform,
     ):
         found_module = {
+            "github.com/nsbno/terraform-aws-ecs-service": {
+                "name": "ecs",
+                "file_path": Path("infrastructure/main.tf"),
+            },
             "github.com/nsbno/terraform-aws-account-metadata": {
                 "name": "account_metadata",
             },
         }
 
         terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
-            found_module[module]
+            found_module.get(module)
         )
 
     @pytest.fixture
@@ -541,3 +572,217 @@ def test_find_openapi_spec_returns_none_when_circleci_folder_does_not_exist(
 
     assert result is None
     file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))
+
+
+def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: Terraform,
+) -> None:
+    """Test upgrade works when ECS module is in service.tf, not main.tf."""
+    # Module is in service.tf
+    terraform_modifier.find_module.return_value = {
+        "name": "ecs_service",
+        "file_path": Path("terraform/template/service.tf"),
+        "source": "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0",
+    }
+    terraform_modifier.has_module.return_value = True
+
+    service_tf_content = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        "}\n"
+    )
+    file_handler.read_file.return_value = service_tf_content
+    terraform_modifier.update_module_versions.return_value = (
+        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+    )
+    terraform_modifier.add_test_listener_to_ecs_module.return_value = (
+        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+    )
+
+    written_files = {}
+    file_handler.overwrite_file.side_effect = lambda path, content: (
+        written_files.update({str(path): content})
+    )
+
+    application.upgrade_terraform_application_resources("terraform/template")
+
+    # Should write to service.tf, NOT main.tf
+    assert "terraform/template/service.tf" in written_files
+    assert "3.0.0-rc3" in written_files["terraform/template/service.tf"]
+
+
+def test_replace_image_with_ecr_when_ecs_in_separate_file(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: Terraform,
+) -> None:
+    """Test image replacement works when ECS module is in ecs.tf, not main.tf."""
+    terraform_modifier.find_module.return_value = {
+        "name": "ecs_service",
+        "file_path": Path("terraform/template/ecs.tf"),
+        "source": "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0",
+    }
+
+    ecs_tf_content = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        '  image = "old-image"\n'
+        "}\n"
+    )
+    file_handler.read_file.return_value = ecs_tf_content
+
+    terraform_modifier.add_data_source.return_value = (
+        'data "aws_ecr_repository" "this" {}\n' + ecs_tf_content
+    )
+    terraform_modifier.remove_vydev_artifact_reference.return_value = (
+        'data "aws_ecr_repository" "this" {}\n' + ecs_tf_content
+    )
+    terraform_modifier.replace_image_tag_on_ecs_module.return_value = (
+        'data "aws_ecr_repository" "this" {}\n'
+        'module "ecs_service" {\n'
+        '  repository_url = data.aws_ecr_repository.this.repository_url\n'
+        "}\n"
+    )
+
+    written_files = {}
+    file_handler.overwrite_file.side_effect = lambda path, content: (
+        written_files.update({str(path): content})
+    )
+
+    application.replace_image_with_ecr_repository_url(
+        "terraform/template", "my-repo", "123456789"
+    )
+
+    # Should write to ecs.tf, NOT main.tf
+    assert "terraform/template/ecs.tf" in written_files
+    assert "repository_url" in written_files["terraform/template/ecs.tf"]
+
+
+def test_upgrade_aws_repo_when_oidc_module_in_separate_file(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: Terraform,
+) -> None:
+    """Test AWS repo upgrade works when OIDC module is in github.tf, not main.tf."""
+    terraform_modifier.find_module.return_value = {
+        "name": "github_actions_oidc",
+        "file_path": Path("terraform/service/github.tf"),
+        "source": "github.com/nsbno/terraform-aws-github-oidc?ref=0.0.1",
+    }
+    terraform_modifier.has_module.return_value = True
+
+    github_tf_content = (
+        'module "github_actions_oidc" {\n'
+        '  source = "github.com/nsbno/terraform-aws-github-oidc?ref=0.0.1"\n'
+        "}\n"
+    )
+    file_handler.read_file.return_value = github_tf_content
+    terraform_modifier.update_module_versions.return_value = (
+        github_tf_content.replace("0.0.1", "0.1.0")
+    )
+
+    written_files = {}
+    file_handler.overwrite_file.side_effect = lambda path, content: (
+        written_files.update({str(path): content})
+    )
+
+    application.upgrade_aws_repo_terraform_resources("terraform/service")
+
+    # Should write to github.tf, NOT main.tf
+    assert "terraform/service/github.tf" in written_files
+    assert "0.1.0" in written_files["terraform/service/github.tf"]
+
+
+def test_upgrade_terraform_resources_with_modules_in_multiple_files(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: Terraform,
+) -> None:
+    """Test that modules spread across multiple files all get updated correctly.
+
+    Scenario:
+    - ECS module in ecs.tf
+    - Lambda module in lambda.tf
+    - Account metadata in main.tf
+    - All should be updated in their respective files
+    """
+    # Mock find_module to return different files for different modules
+    module_locations = {
+        "github.com/nsbno/terraform-aws-ecs-service": {
+            "name": "ecs",
+            "file_path": Path("terraform/template/ecs.tf"),
+        },
+        "github.com/nsbno/terraform-aws-lambda": {
+            "name": "lambda",
+            "file_path": Path("terraform/template/lambda.tf"),
+        },
+        "github.com/nsbno/terraform-aws-account-metadata": {
+            "name": "metadata",
+            "file_path": Path("terraform/template/main.tf"),
+        },
+    }
+    terraform_modifier.find_module.side_effect = lambda module, *_: (
+        module_locations.get(module)
+    )
+    terraform_modifier.has_module.return_value = True
+
+    # Mock file contents for each file (mutable dict that gets updated)
+    file_contents = {
+        Path("terraform/template/ecs.tf"): (
+            'module "ecs" {\n'
+            '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+            "}\n"
+        ),
+        Path("terraform/template/lambda.tf"): (
+            'module "lambda" {\n'
+            '  source = "github.com/nsbno/terraform-aws-lambda?ref=1.0.0"\n'
+            "}\n"
+        ),
+        Path("terraform/template/main.tf"): (
+            'module "metadata" {\n'
+            '  source = "github.com/nsbno/terraform-aws-account-metadata?ref=0.4.0"\n'
+            "}\n"
+        ),
+    }
+
+    # read_file returns current content from file_contents
+    file_handler.read_file.side_effect = lambda path: file_contents[path]
+
+    # Mock update_module_versions to return updated content
+    def mock_update(content, target_modules):
+        for module_source, new_version in target_modules.items():
+            if module_source in content:
+                # Simple replacement for testing
+                content = content.replace(
+                    module_source.split("/")[-1] + "?ref=",
+                    module_source.split("/")[-1] + f"?ref={new_version}|",
+                ).replace("|", "")
+        return content
+
+    terraform_modifier.update_module_versions.side_effect = mock_update
+    terraform_modifier.add_test_listener_to_ecs_module.side_effect = (
+        lambda config, **_: config
+    )
+
+    written_files = {}
+
+    def mock_overwrite(path, content):
+        written_files[path] = content
+        # Also update file_contents so subsequent reads get the updated content
+        file_contents[path] = content
+
+    file_handler.overwrite_file.side_effect = mock_overwrite
+
+    application.upgrade_terraform_application_resources("terraform/template")
+
+    # All three files should be updated
+    assert Path("terraform/template/ecs.tf") in written_files
+    assert Path("terraform/template/lambda.tf") in written_files
+    assert Path("terraform/template/main.tf") in written_files
+
+    # Each file should have the correct version
+    assert "3.0.0-rc3" in written_files[Path("terraform/template/ecs.tf")]
+    assert "2.0.0-beta1" in written_files[Path("terraform/template/lambda.tf")]
+    assert "0.5.0" in written_files[Path("terraform/template/main.tf")]

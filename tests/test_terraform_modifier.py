@@ -524,3 +524,105 @@ def test_remove_vydev_artifacts(terraform_modifier: Terraform) -> None:
     )
 
     assert updated_config == expected_config
+
+
+def test_has_module_finds_ecs_module_in_main_tf(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
+    """Test has_module finds ECS module in template/main.tf (baseline)."""
+    terraform_config = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        '  name = "my-service"\n'
+        "}\n"
+    )
+
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+    main_tf = template_dir / "main.tf"
+    main_tf.write_text(terraform_config)
+
+    result = terraform_modifier.has_module(
+        "github.com/nsbno/terraform-aws-ecs-service", tmp_path
+    )
+
+    assert result is True
+
+
+def test_has_module_finds_ecs_module_in_separate_file(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
+    """Test has_module finds ECS module in template/service.tf (not main.tf)."""
+    terraform_config = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        '  name = "my-service"\n'
+        "}\n"
+    )
+
+    template_dir = tmp_path / "template"
+    template_dir.mkdir()
+
+    # Create main.tf with other content
+    main_tf = template_dir / "main.tf"
+    main_tf.write_text('resource "aws_s3_bucket" "example" {}\n')
+
+    # Put ECS module in service.tf
+    service_tf = template_dir / "service.tf"
+    service_tf.write_text(terraform_config)
+
+    result = terraform_modifier.has_module(
+        "github.com/nsbno/terraform-aws-ecs-service", tmp_path
+    )
+
+    assert result is True
+
+
+def test_has_module_finds_ecs_module_in_subdirectory(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
+    """Test has_module finds ECS module in nested directory structure."""
+    terraform_config = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        '  name = "my-service"\n'
+        "}\n"
+    )
+
+    # Create nested structure: template/modules/ecs.tf
+    modules_dir = tmp_path / "template" / "modules"
+    modules_dir.mkdir(parents=True)
+
+    ecs_tf = modules_dir / "ecs.tf"
+    ecs_tf.write_text(terraform_config)
+
+    result = terraform_modifier.has_module(
+        "github.com/nsbno/terraform-aws-ecs-service", tmp_path
+    )
+
+    assert result is True
+
+
+def test_has_module_finds_ecs_module_in_service_folder(
+    terraform_modifier: RegexTerraformModifier, tmp_path
+):
+    """Test has_module finds ECS module when in service/ instead of template/."""
+    terraform_config = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        '  name = "my-service"\n'
+        "}\n"
+    )
+
+    # Some repos have service/ folder instead of template/
+    service_dir = tmp_path / "service"
+    service_dir.mkdir()
+
+    main_tf = service_dir / "main.tf"
+    main_tf.write_text(terraform_config)
+
+    result = terraform_modifier.has_module(
+        "github.com/nsbno/terraform-aws-ecs-service", tmp_path
+    )
+
+    assert result is True

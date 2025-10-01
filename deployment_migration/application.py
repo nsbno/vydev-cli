@@ -422,7 +422,16 @@ class DeploymentMigration:
         terraform_folder: str,
     ):
         """Adds required resources to the AWS repo"""
-        file_to_modify = Path(f"{terraform_folder}/main.tf")
+        # Find which file contains the OIDC module instead of assuming main.tf
+        oidc_module = self.terraform.find_module(
+            "github.com/nsbno/terraform-aws-github-oidc", Path(terraform_folder)
+        )
+
+        if oidc_module:
+            file_to_modify = oidc_module["file_path"]
+        else:
+            # Fallback to main.tf if OIDC module not found
+            file_to_modify = Path(f"{terraform_folder}/main.tf")
 
         terraform_config = self.file_handler.read_file(file_to_modify)
 
@@ -541,8 +550,21 @@ class DeploymentMigration:
         repository_name: str,
         service_account_id: str,
     ):
-        terraform_main_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
-        terraform_config = self.file_handler.read_file(terraform_main_file_path)
+        # Find which file contains the ECS module instead of assuming main.tf
+        ecs_module = self.terraform.find_module(
+            "github.com/nsbno/terraform-aws-ecs-service",
+            Path(terraform_infrastructure_folder),
+        )
+
+        if ecs_module:
+            terraform_file_path = ecs_module["file_path"]
+        else:
+            # Fallback to main.tf if ECS module not found
+            terraform_file_path = Path(
+                f"{terraform_infrastructure_folder}/main.tf"
+            )
+
+        terraform_config = self.file_handler.read_file(terraform_file_path)
 
         terraform_config = self.terraform.add_data_source(
             terraform_config,
@@ -562,53 +584,85 @@ class DeploymentMigration:
             terraform_config, "this"
         )
 
-        self.file_handler.overwrite_file(terraform_main_file_path, terraform_config)
+        self.file_handler.overwrite_file(terraform_file_path, terraform_config)
 
     def upgrade_terraform_application_resources(
         self: Self,
         terraform_infrastructure_folder: str,
     ) -> None:
         """Upgrades the ECS and Lambda modules"""
-        terraform_main_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
-        terraform_config = self.file_handler.read_file(terraform_main_file_path)
+        target_modules = {
+            "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc3",
+            # TODO: This is not released yet
+            "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",
+            "github.com/nsbno/terraform-aws-account-metadata": "0.5.0",
+        }
 
-        terraform_config = self.terraform.update_module_versions(
-            terraform_config,
-            target_modules={
-                "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc3",
-                # TODO: This is not released yet
-                "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
-                "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",
-                "github.com/nsbno/terraform-aws-account-metadata": "0.5.0",
-            },
-        )
+        # Update each module in its own file
+        for module_source, new_version in target_modules.items():
+            module_info = self.terraform.find_module(
+                module_source, Path(terraform_infrastructure_folder)
+            )
 
+            if module_info:
+                # Module exists - update it in its current file
+                terraform_file_path = module_info["file_path"]
+                terraform_config = self.file_handler.read_file(terraform_file_path)
+
+                # Update just this module
+                terraform_config = self.terraform.update_module_versions(
+                    terraform_config,
+                    target_modules={module_source: new_version},
+                )
+
+                self.file_handler.overwrite_file(
+                    terraform_file_path, terraform_config
+                )
+
+        # Handle ECS-specific additions
         if self.terraform.has_module(
             "github.com/nsbno/terraform-aws-ecs-service",
             Path(terraform_infrastructure_folder),
         ):
+            ecs_module = self.terraform.find_module(
+                "github.com/nsbno/terraform-aws-ecs-service",
+                Path(terraform_infrastructure_folder),
+            )
+            ecs_file_path = ecs_module["file_path"]
+
             module_info = self.terraform.find_module(
                 "github.com/nsbno/terraform-aws-account-metadata",
                 Path(terraform_infrastructure_folder),
             )
+
+            # Add account_metadata module if it doesn't exist (goes to main.tf)
             if not module_info:
+                main_tf_path = Path(
+                    f"{terraform_infrastructure_folder}/main.tf"
+                )
+                main_tf_config = self.file_handler.read_file(main_tf_path)
+
                 module_name = "account_metadata"
-                terraform_config = self.terraform.add_module(
-                    terraform_config,
+                main_tf_config = self.terraform.add_module(
+                    main_tf_config,
                     name=module_name,
                     source="github.com/nsbno/terraform-aws-account-metadata",
                     version="0.5.0",
                 )
+
+                self.file_handler.overwrite_file(main_tf_path, main_tf_config)
             else:
                 module_name = module_info["name"]
 
-            # We need to add a new variable for the test listener
-            terraform_config = self.terraform.add_test_listener_to_ecs_module(
-                terraform_config,
+            # Add test listener to ECS module (read latest version from disk)
+            # The ECS file was already updated in the loop above
+            ecs_config = self.file_handler.read_file(ecs_file_path)
+            ecs_config = self.terraform.add_test_listener_to_ecs_module(
+                ecs_config,
                 metadata_module_name=module_name,
             )
-
-        self.file_handler.overwrite_file(terraform_main_file_path, terraform_config)
+            self.file_handler.overwrite_file(ecs_file_path, ecs_config)
 
     def is_repo_in_clean_state(self) -> bool:
         """Checks if the Git repository is in a clean state
