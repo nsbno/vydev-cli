@@ -575,9 +575,7 @@ class DeploymentMigration:
             terraform_file_path = ecs_module["file_path"]
         else:
             # Fallback to main.tf if ECS module not found
-            terraform_file_path = Path(
-                f"{terraform_infrastructure_folder}/main.tf"
-            )
+            terraform_file_path = Path(f"{terraform_infrastructure_folder}/main.tf")
 
         terraform_config = self.file_handler.read_file(terraform_file_path)
 
@@ -631,9 +629,7 @@ class DeploymentMigration:
                     target_modules={module_source: new_version},
                 )
 
-                self.file_handler.overwrite_file(
-                    terraform_file_path, terraform_config
-                )
+                self.file_handler.overwrite_file(terraform_file_path, terraform_config)
 
         # Handle ECS-specific additions
         if self.terraform.has_module(
@@ -653,9 +649,7 @@ class DeploymentMigration:
 
             # Add account_metadata module if it doesn't exist (goes to main.tf)
             if not module_info:
-                main_tf_path = Path(
-                    f"{terraform_infrastructure_folder}/main.tf"
-                )
+                main_tf_path = Path(f"{terraform_infrastructure_folder}/main.tf")
                 main_tf_config = self.file_handler.read_file(main_tf_path)
 
                 module_name = "account_metadata"
