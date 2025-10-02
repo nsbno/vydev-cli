@@ -154,6 +154,13 @@ def test_creates_and_writes_github_action_deployment_workflow(
         expected_pull_request_file
     )
 
+    expected_pull_request_comment_file = (
+        "Never gonna make you cry, never gonna say goodbye"
+    )
+    github_actions_author.create_pull_request_comment_workflow.return_value = (
+        expected_pull_request_comment_file
+    )
+
     application.create_github_action_deployment_workflow(
         repository_name="test-app",
         application_name="test-app",
@@ -163,8 +170,11 @@ def test_creates_and_writes_github_action_deployment_workflow(
     )
 
     assert created_files == {
-        Path(".github/workflows/deploy.yml"): expected_deployment_file,
+        Path(".github/workflows/build-and-deploy.yml"): expected_deployment_file,
         Path(".github/workflows/pull-request.yml"): expected_pull_request_file,
+        Path(
+            ".github/workflows/pull-request-comment.yml"
+        ): expected_pull_request_comment_file,
     }
 
 

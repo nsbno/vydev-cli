@@ -222,6 +222,20 @@ class GithubActionsAuthor(abc.ABC):
     ) -> str:
         pass
 
+    @abc.abstractmethod
+    def create_pull_request_comment_workflow(
+        self: Self,
+        repository_name: str,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+        dockerfile_path: str = None,
+        skip_service_environment: bool = False,
+        aws_role_name: Optional[str] = None,
+    ) -> str:
+        pass
+
 
 class ApplicationContext(abc.ABC):
     @abc.abstractmethod
@@ -448,7 +462,8 @@ class DeploymentMigration:
         )
 
         self.file_handler.create_file(
-            Path(".github/workflows/deploy.yml"), github_actions_deployment_workflow
+            Path(".github/workflows/build-and-deploy.yml"),
+            github_actions_deployment_workflow,
         )
 
         pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
@@ -465,6 +480,24 @@ class DeploymentMigration:
 
         self.file_handler.create_file(
             Path(".github/workflows/pull-request.yml"), pull_request_workflow
+        )
+
+        pull_request_comment_workflow = (
+            self.github_actions_author.create_pull_request_comment_workflow(
+                repository_name,
+                application_name,
+                application_build_tool,
+                application_runtime_target,
+                terraform_base_folder,
+                dockerfile_path=dockerfile_path,
+                skip_service_environment=skip_service_environment,
+                aws_role_name=aws_role_name,
+            )
+        )
+
+        self.file_handler.create_file(
+            Path(".github/workflows/pull-request-comment.yml"),
+            pull_request_comment_workflow,
         )
 
     def upgrade_aws_repo_terraform_resources(
@@ -640,7 +673,7 @@ class DeploymentMigration:
     ) -> None:
         """Upgrades the ECS and Lambda modules"""
         target_modules = {
-            "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc3",
+            "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc7",
             # TODO: This is not released yet
             "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
             "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",

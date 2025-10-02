@@ -245,3 +245,58 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         yaml_string = yaml.dump(workflow, sort_keys=False)
 
         return yaml_string
+
+    def create_pull_request_comment_workflow(
+        self: Self,
+        repository_name: str,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+        dockerfile_path: str = None,
+        skip_service_environment: bool = False,
+        aws_role_name: str = None,
+    ) -> str:
+        """
+        Create a GitHub Actions pull request comment workflow for branch deployments.
+        """
+        # Deploy to test environment on .deploy comment
+        deploy_to_test_with = {
+            "applications": application_name,
+        }
+
+        if aws_role_name:
+            deploy_to_test_with["aws-role-name-to-assume"] = aws_role_name
+
+        # Terraform plan on .tf comment
+        tf_plan_with = {}
+
+        if skip_service_environment:
+            tf_plan_with["skip-service-environment"] = True
+
+        jobs = {
+            "deploy-to-test": {
+                "uses": self._workflow("deployment", "branch-deploy.on-comment", "v1"),
+                "secrets": "inherit",
+                "with": deploy_to_test_with,
+            },
+            "tf-plan-comment": {
+                "uses": self._workflow("helpers", "terraform-plan.on-comment", "v1"),
+                "secrets": "inherit",
+            },
+        }
+
+        # Only add 'with' to tf-plan-comment if we have parameters
+        if tf_plan_with:
+            jobs["tf-plan-comment"]["with"] = tf_plan_with
+
+        workflow: Dict[str, Any] = {
+            "name": "deploy-to-branch",
+            "on": {"issue_comment": {"types": ["created"]}},
+            "jobs": jobs,
+        }
+
+        # Convert the workflow to YAML
+        yaml_string = yaml.dump(workflow, sort_keys=False)
+
+        return yaml_string
