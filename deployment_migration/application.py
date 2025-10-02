@@ -7,6 +7,14 @@ from typing import Self, Any, Optional
 import yaml
 
 
+# Teams that require custom AWS role name for GitHub Actions
+CUSTOM_AWS_ROLE_PREFIXES = [
+    "alternativ-transport",  # Note: single 'v', not "alternative"
+    "drifts-informasjon",
+    "trafficcontrol",
+]
+
+
 class ApplicationBuildTool(StrEnum):
     PYTHON = "python"
     GRADLE = "gradle"
@@ -196,6 +204,7 @@ class GithubActionsAuthor(abc.ABC):
         gradle_file_path: str = None,
         openapi_spec_path: str = None,
         skip_service_environment: bool = False,
+        aws_role_name: Optional[str] = None,
     ) -> str:
         pass
 
@@ -209,6 +218,7 @@ class GithubActionsAuthor(abc.ABC):
         terraform_base_folder: Path,
         dockerfile_path: str = None,
         skip_service_environment: bool = False,
+        aws_role_name: Optional[str] = None,
     ) -> str:
         pass
 
@@ -310,6 +320,23 @@ class DeploymentMigration:
         except FileNotFoundError:
             return False
 
+    def requires_custom_aws_role(self: Self) -> bool:
+        """Check if current repository requires custom AWS role name"""
+        folder_name = self.file_handler.current_folder_name().lower()
+        return any(
+            folder_name.startswith(prefix.lower())
+            for prefix in CUSTOM_AWS_ROLE_PREFIXES
+        )
+
+    def get_aws_role_name(self: Self) -> Optional[str]:
+        """Get AWS role name if custom role required, None otherwise"""
+        if self.requires_custom_aws_role():
+            # This is based on the name that driftsinformasjon and
+            # alternativ transport uses in their AWS accounts.
+            # This is based on some legacy reasons where they set up before us.
+            return "github_actions_assume_role"
+        return None
+
     def find_all_environment_folders(self: Self) -> list[Path]:
         """Finds all terraform environment folders"""
         potential_folder_locations = [
@@ -385,12 +412,13 @@ class DeploymentMigration:
                 pass
 
         # Find Gradle folder if we're using Gradle
+        gradle_folder_path = None
         if application_build_tool == ApplicationBuildTool.GRADLE:
             try:
                 gradle_folder_path = str(self.find_gradle_folder())
             except NotFoundError:
                 # If Gradle folder is not found, we'll proceed without it
-                gradle_folder_path = None
+                pass
 
         try:
             openapi_spec = self._find_openapi_spec()
@@ -401,6 +429,9 @@ class DeploymentMigration:
         # Check if service environment exists
         skip_service_environment = not self.has_service_environment()
 
+        # Check if custom AWS role is needed
+        aws_role_name = self.get_aws_role_name()
+
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -409,8 +440,10 @@ class DeploymentMigration:
                 application_runtime_target,
                 terraform_base_folder,
                 dockerfile_path=dockerfile_path,
+                gradle_folder_path=gradle_folder_path,
                 openapi_spec_path=openapi_spec_path,
                 skip_service_environment=skip_service_environment,
+                aws_role_name=aws_role_name,
             )
         )
 
@@ -425,7 +458,9 @@ class DeploymentMigration:
             application_runtime_target,
             terraform_base_folder,
             dockerfile_path=dockerfile_path,
+            gradle_folder_path=gradle_folder_path,
             skip_service_environment=skip_service_environment,
+            aws_role_name=aws_role_name,
         )
 
         self.file_handler.create_file(

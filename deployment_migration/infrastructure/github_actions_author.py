@@ -24,6 +24,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         add_tests: bool = True,
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
+        aws_role_name: str = None,
     ) -> dict[str, Any]:
         if build_tool == ApplicationBuildTool.GRADLE:
             build_with_params = {
@@ -70,6 +71,9 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             if dockerfile_path and dockerfile_path != Path("Dockerfile"):
                 with_params["dockerfile"] = dockerfile_path
 
+            if aws_role_name:
+                with_params["aws-role-name-to-assume"] = aws_role_name
+
             package_step = {
                 "package": {
                     "uses": self._workflow("package", "docker", "v1"),
@@ -107,6 +111,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         dockerfile_path: str = None,
         gradle_folder_path: str = None,
         skip_service_environment: bool = False,
+        aws_role_name: str = None,
     ) -> str:
         """
         Create a GitHub Actions pull request workflow for the application.
@@ -117,6 +122,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             application_runtime_target,
             dockerfile_path=dockerfile_path,
             gradle_folder_path=gradle_folder_path,
+            aws_role_name=aws_role_name,
         )
         jobs.pop("package")
 
@@ -169,6 +175,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         gradle_folder_path: str = None,
         openapi_spec_path: str = None,
         skip_service_environment: bool = False,
+        aws_role_name: str = None,
     ) -> str:
         """
         Create a GitHub Actions deployment workflow for the application.
@@ -197,6 +204,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                 application_runtime_target,
                 dockerfile_path=dockerfile_path,
                 gradle_folder_path=gradle_folder_path,
+                aws_role_name=aws_role_name,
             ),
         }
 
@@ -215,6 +223,9 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         if skip_service_environment:
             deploy_with["skip-service-environment"] = True
+
+        if aws_role_name:
+            deploy_with["aws-role-name-to-assume"] = aws_role_name
 
         jobs["deploy"] = {
             "needs": [name for name in jobs.keys()],

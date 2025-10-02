@@ -935,3 +935,172 @@ class TestWorkflowGenerationWithServiceFlag:
             github_actions_author.create_pull_request_workflow.call_args.kwargs
         )
         assert call_kwargs.get("skip_service_environment") is True
+
+
+class TestTeamSpecificAWSRole:
+    """Tests for team-specific AWS role detection and configuration"""
+
+    def test_requires_custom_aws_role_for_alternativ_transport_team(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """alternativ-transport team requires custom AWS role"""
+        file_handler.current_folder_name.return_value = (
+            "alternativ-transport-brudd-backend"
+        )
+
+        result = application.requires_custom_aws_role()
+
+        assert result is True
+
+    def test_requires_custom_aws_role_for_drifts_informasjon_team(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """drifts-informasjon team requires custom AWS role"""
+        file_handler.current_folder_name.return_value = "drifts-informasjon-api"
+
+        result = application.requires_custom_aws_role()
+
+        assert result is True
+
+    def test_requires_custom_aws_role_for_trafficcontrol_team(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """trafficcontrol team requires custom AWS role"""
+        file_handler.current_folder_name.return_value = "trafficcontrol-service"
+
+        result = application.requires_custom_aws_role()
+
+        assert result is True
+
+    def test_requires_custom_aws_role_returns_false_for_standard_team(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Standard teams do not require custom AWS role"""
+        file_handler.current_folder_name.return_value = "booking-api"
+
+        result = application.requires_custom_aws_role()
+
+        assert result is False
+
+    def test_get_aws_role_name_returns_custom_role_for_special_teams(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Returns github_actions_assume_role for teams needing custom role"""
+        file_handler.current_folder_name.return_value = (
+            "alternativ-transport-brudd-backend"
+        )
+
+        result = application.get_aws_role_name()
+
+        assert result == "github_actions_assume_role"
+
+    def test_get_aws_role_name_returns_none_for_standard_teams(
+        self,
+        application: DeploymentMigration,
+        file_handler: FileHandler,
+    ) -> None:
+        """Returns None for standard teams using default role"""
+        file_handler.current_folder_name.return_value = "booking-api"
+
+        result = application.get_aws_role_name()
+
+        assert result is None
+
+
+class TestWorkflowGenerationWithCustomAWSRole:
+    """Tests for AWS role parameter in workflow generation"""
+
+    def test_deployment_workflow_includes_aws_role_for_special_teams(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """Workflow should include aws-role-name-to-assume for special teams"""
+        file_handler.current_folder_name.return_value = (
+            "alternativ-transport-brudd-backend"
+        )
+        file_handler.folder_exists.return_value = True
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_deployment_workflow.return_value = "name: Deploy\n"
+        github_actions_author.create_pull_request_workflow.return_value = "name: PR\n"
+
+        application.create_github_action_deployment_workflow(
+            repository_name="alternativ-transport-brudd-backend",
+            application_name="brudd-backend",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify the workflow generator was called with aws_role_name
+        github_actions_author.create_deployment_workflow.assert_called_once()
+        call_kwargs = github_actions_author.create_deployment_workflow.call_args.kwargs
+        assert call_kwargs.get("aws_role_name") == "github_actions_assume_role"
+
+    def test_deployment_workflow_omits_aws_role_for_standard_teams(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """Workflow should NOT include aws-role-name-to-assume for standard teams"""
+        file_handler.current_folder_name.return_value = "booking-api"
+        file_handler.folder_exists.return_value = True
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_deployment_workflow.return_value = "name: Deploy\n"
+        github_actions_author.create_pull_request_workflow.return_value = "name: PR\n"
+
+        application.create_github_action_deployment_workflow(
+            repository_name="booking-api",
+            application_name="booking",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify the workflow generator was called with None or no aws_role_name
+        github_actions_author.create_deployment_workflow.assert_called_once()
+        call_kwargs = github_actions_author.create_deployment_workflow.call_args.kwargs
+        assert call_kwargs.get("aws_role_name") is None
+
+    def test_pull_request_workflow_includes_aws_role_for_special_teams(
+        self,
+        application: DeploymentMigration,
+        github_actions_author: GithubActionsAuthor,
+        file_handler: FileHandler,
+    ) -> None:
+        """PR workflow should also get AWS role parameter for special teams"""
+        file_handler.current_folder_name.return_value = "drifts-informasjon-api"
+        file_handler.folder_exists.return_value = True
+        file_handler.read_file.side_effect = FileNotFoundError()
+
+        github_actions_author.create_deployment_workflow.return_value = "name: Deploy\n"
+        github_actions_author.create_pull_request_workflow.return_value = "name: PR\n"
+
+        application.create_github_action_deployment_workflow(
+            repository_name="drifts-informasjon-api",
+            application_name="drifts-api",
+            application_build_tool=ApplicationBuildTool.PYTHON,
+            application_runtime_target=ApplicationRuntimeTarget.ECS,
+            terraform_base_folder=Path("terraform"),
+        )
+
+        # Verify PR workflow generator was called with aws_role_name
+        github_actions_author.create_pull_request_workflow.assert_called_once()
+        call_kwargs = (
+            github_actions_author.create_pull_request_workflow.call_args.kwargs
+        )
+        assert call_kwargs.get("aws_role_name") == "github_actions_assume_role"
