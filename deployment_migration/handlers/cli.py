@@ -6,7 +6,6 @@ import argparse
 from pathlib import Path
 
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
@@ -16,8 +15,8 @@ from deployment_migration.application import (
     ApplicationRuntimeTarget,
     NotFoundError,
     ConfigCache,
-    MigrationConfig,
 )
+from deployment_migration.handlers.view import Queryier, Terminal
 from deployment_migration.infrastructure.file_handler import (
     LocalFileHandler,
 )
@@ -41,10 +40,6 @@ from deployment_migration.infrastructure.application_context import (
     ApplicationContextFinder,
 )
 from deployment_migration.infrastructure.config_cache import JsonConfigCache
-
-
-class Terminal:
-    pass
 
 
 class CLIHandler:
@@ -71,6 +66,8 @@ class CLIHandler:
         self.deployment_migration = deployment_migration
         self.config_cache = config_cache
         self.console = console or Console()
+        self.terminal = Terminal(self.console)
+        self.queryier = Queryier(self.terminal)
 
     def check_repo_clean_state(self) -> bool:
         """
@@ -83,11 +80,12 @@ class CLIHandler:
                   False if the user wants to abort.
         """
         if not self.deployment_migration.is_repo_in_clean_state():
-            self.console.print(
-                "[bold yellow]Warning: The git repository has uncommitted changes.[/bold yellow]"
-            )
-            self.console.print(
-                "It is recommended to commit or stash your existing changes before proceeding."
+            self.terminal.warn(
+                short="This repo is not in a clean state.",
+                long=(
+                    "It is recommended to commit or stash your "
+                    "existing changes before proceeding."
+                ),
             )
             return Confirm.ask("Do you want to continue anyway?")
         return True
@@ -97,11 +95,12 @@ class CLIHandler:
         Handle the AWS repo upgrade operation.
         """
         if not self.deployment_migration.is_aws_repo():
-            self.console.print(
-                "[bold yellow]"
-                "Warning: This repo doesn't end with `-aws`."
-                "[/bold yellow]\n"
-                "This is just a safety check to make sure you're not upgrading the wrong repo."
+            self.terminal.warn(
+                short="This repo doesn't end with `-aws`.",
+                long=(
+                    "This is just a safety check to make sure "
+                    "you're not upgrading the wrong repo."
+                ),
             )
             if not Confirm.ask("Is this repo your team's AWS repo?"):
                 self.console.print(
@@ -113,42 +112,30 @@ class CLIHandler:
 
         self.console.print(Panel("[bold]Upgrade AWS Repo[/bold]"))
 
+        self.terminal.hr_line()
+
         # Get terraform folder from user
-        try:
-            guessed_terraform_folder = (
-                self.deployment_migration.find_terraform_infrastructure_folder()
-            )
-        except FileNotFoundError:
-            guessed_terraform_folder = None
-        terraform_infrastructure_folder = Prompt.ask(
-            "Enter the terraform template/infrastrcuture folder path",
-            default=(
-                str(guessed_terraform_folder) if guessed_terraform_folder else None
+        terraform_infrastructure_folder = self.queryier.ask_user_with_default_and_hint(
+            question="Where is the terraform infrastructure folder?",
+            default_query=lambda: str(
+                self.deployment_migration.find_terraform_infrastructure_folder(),
             ),
         )
 
-        try:
-            guessed_terraform_service_folder = (
-                self.deployment_migration.find_terraform_environment_folder("service")
-            )
-        except FileNotFoundError:
-            guessed_terraform_service_folder = None
-        terraform_service_folder = Prompt.ask(
-            "Enter the terraform service environment folder path",
-            default=(
-                str(guessed_terraform_service_folder)
-                if guessed_terraform_service_folder
-                else None
+        self.terminal.hr_line()
+
+        terraform_service_folder = self.queryier.ask_user_with_default_and_hint(
+            question="Where is the terraform service environment folder?",
+            default_query=lambda: str(
+                self.deployment_migration.find_terraform_environment_folder("service"),
             ),
         )
 
-        self.console.print("\n[yellow]Upgrading AWS repo...[/yellow]")
-        self.deployment_migration.upgrade_aws_repo_terraform_resources(
-            terraform_infrastructure_folder
-        )
-        self.deployment_migration.upgrade_aws_repo_terraform_resources(
-            terraform_service_folder
-        )
+        self.terminal.update("Upgrading AWS Repo...")
+
+        for folder in [terraform_service_folder, terraform_infrastructure_folder]:
+            self.deployment_migration.upgrade_aws_repo_terraform_resources(folder)
+
         try:
             self.deployment_migration.upgrade_aws_repo_alb_resources(
                 Path(terraform_infrastructure_folder)
@@ -178,106 +165,58 @@ class CLIHandler:
         pull-request.yml and pull-request-comment.yml workflows that
         allow testing the migration before full deployment.
         """
-        hr_line = Markdown("---")
-        self.console.print(Panel("[bold]Setup PR Workflows[/bold]"))
-
-        self.console.print(
-            "\nBefore migrating your deployment pipeline, we'll set up PR workflows that\n"
-            "let you test all the migration changes safely.\n"
+        self.terminal.heading_and_info(
+            heading="Setup PR Workflows",
+            info=(
+                "This step will generate PR workflows "
+                "that let you test all the migration changes safely "
+                "using pull requests."
+            ),
         )
 
         # Try to find terraform infrastructure folder automatically
-        try:
-            terraform_folder = str(
-                self.deployment_migration.find_terraform_infrastructure_folder()
-            )
-        except FileNotFoundError:
-            terraform_folder = None
-
-        if terraform_folder is None:
-            self.console.print(
-                "[italic blue]Hint: [/italic blue]"
-                "[italic]Terraform infrastructure folder path is the parent directory of test, stage, service and prod[/italic]"
-            )
-        terraform_folder_str = Prompt.ask(
-            "[bold]Enter the terraform infrastructure folder path[/bold]",
-            default=terraform_folder,
-        )
-        terraform_folder = Path(terraform_folder_str)
-
-        # Get repository name
-        try:
-            guessed_repository_name = self.deployment_migration.find_application_name(
-                terraform_folder
-            )
-        except Exception:
-            guessed_repository_name = None
-
-        self.console.print(hr_line)
-        if guessed_repository_name is None:
-            self.console.print(
-                "[italic blue]Hint: [/italic blue]"
-                "[italic]ECR repo name may be found in the `service` environment of your -aws repo.[/italic]"
-            )
-        repository_name = Prompt.ask(
-            "[bold]What is the name of the service's ECR Repository?[/bold]",
-            default=guessed_repository_name,
+        terraform_folder = self.queryier.ask_user_with_default_and_hint(
+            question="Where is the terraform infrastructure folder?",
+            default_query=lambda: str(
+                self.deployment_migration.find_terraform_infrastructure_folder(),
+            ),
         )
 
-        # Get application name
-        self.console.print(hr_line)
-        self.console.print(
-            "[italic blue]Hint: [/italic blue]"
-            "[italic]Service name can be found in the Terraform file where the ECS service or Lambda function is defined.[/italic]"
+        repository_name = self.queryier.ask_user_with_default_and_hint(
+            question="What is the name of the service's ECR Repository?",
+            hint="ECR repo name is often found in the `service` environment of your -aws repo.",
+            default_query=lambda: self.deployment_migration.find_application_name(
+                Path(terraform_folder)
+            ),
         )
-        application_name = Prompt.ask("[bold]What is the service name?[/bold]")
 
-        # Get build tool
-        try:
-            guessed_build_tool = self.deployment_migration.find_build_tool()
-        except Exception:
-            guessed_build_tool = None
+        application_name = self.queryier.ask_user_with_default_and_hint(
+            question="What is the service name?",
+            hint="Service name can be found in the Terraform file where the ECS service or Lambda function is defined.",
+            default_query=lambda: self.deployment_migration.find_application_name(
+                Path(terraform_folder)
+            ),
+        )
 
-        build_tool = None
-        while build_tool is None:
-            self.console.print(hr_line)
-            build_tool = Prompt.ask(
-                "Select the application build tool",
-                choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
-                default=guessed_build_tool,
-            )
+        build_tool = self.queryier.ask_user_with_default_and_hint(
+            question="What is the application's build tool",
+            hint="Choose the build tool used to package and deploy the application.",
+            choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
+            default_query=lambda: self.deployment_migration.find_build_tool(),
+        )
 
-        # Get runtime target
-        try:
-            guessed_target_runtime = self.deployment_migration.find_aws_runtime(
-                terraform_folder
-            )
-        except Exception:
-            guessed_target_runtime = None
-
-        runtime_target = None
-        while runtime_target is None:
-            self.console.print(hr_line)
-            runtime_target = Prompt.ask(
-                "Select the application runtime target",
-                choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
-                default=guessed_target_runtime,
-            )
-
-        # Save configuration for later use
-        if self.config_cache:
-            config = MigrationConfig(
-                terraform_folder=str(terraform_folder),
-                repository_name=repository_name,
-                application_name=application_name,
-                build_tool=build_tool,
-                runtime_target=runtime_target,
-            )
-            self.config_cache.save_config(config)
+        runtime_target = self.queryier.ask_user_with_default_and_hint(
+            question="What is the application's runtime target",
+            hint="Choose the runtime target for the application.",
+            choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
+            default_query=lambda: self.deployment_migration.find_aws_runtime(
+                Path(terraform_folder)
+            ),
+        )
 
         # Set up GitHub environments for PR workflows
-        self.console.print(hr_line)
-        self.console.print("\n[bold]Setting up GitHub Environments[/bold]\n")
+        self.terminal.hr_line()
+        self.terminal.update("Setting up GitHub Actions Environments...")
 
         environment_folders = self.deployment_migration.find_all_environment_folders()
         new_env_url, repo_address, accounts = (
@@ -286,21 +225,10 @@ class CLIHandler:
             )
         )
 
-        if "Service" not in accounts:
-            service_account_id = Prompt.ask(
-                "What is the account ID of your service account?"
-            )
-            accounts["Service"] = service_account_id
-
         if shutil.which("gh"):
-            self.console.print(
-                "[yellow]Creating GitHub environments using gh CLI...[/yellow]"
-            )
+            self.terminal.update("Creating GitHub environments using gh CLI...")
             self.deployment_migration.initialize_github_environments(
                 accounts, repo_address
-            )
-            self.console.print(
-                "[green]GitHub environments created successfully![/green]"
             )
         else:
             self.console.print(
@@ -318,7 +246,7 @@ class CLIHandler:
                     )
 
         # Generate PR workflows
-        self.console.print("\n[yellow]Generating PR workflows...[/yellow]")
+        self.terminal.update("Generating PR workflows...")
         self.deployment_migration.generate_pr_workflows(
             repository_name=repository_name,
             application_name=application_name,
@@ -355,143 +283,63 @@ class CLIHandler:
         """
         Handle the application repo upgrade operation.
         """
-        hr_line = Markdown("---")
-
-        # PHASE 1: Branch Reminder
-        self.console.print(Panel("[bold yellow]⚠️  Branch Required[/bold yellow]"))
-        self.console.print(
-            "\n[bold]Before proceeding, make sure you're on a migration branch:[/bold]\n"
-            "   [cyan]git checkout -b migrate-to-github-actions[/cyan]\n"
+        self.terminal.heading_and_info(
+            heading="Upgrade Application Repo",
+            info=(
+                "This step will upgrade the application repo to use GitHub Actions "
+                "deployment workflows. It will also remove the old deployment setup."
+            ),
         )
-        if not Confirm.ask("Are you on a migration branch?"):
-            self.console.print(
-                "[yellow]Please create a migration branch first.[/yellow]"
-            )
-            return
 
-        self.console.print(Panel("[bold]Upgrade Application Repo[/bold]"))
+        self.terminal.warn(
+            "Branch Recommended",
+            (
+                "You should be on a separate branch to avoid "
+                "accidentally merging changes to the main branch.\n"
+                "Try [italic]git checkout -b migrate-to-github-actions[/italic]"
+            ),
+        )
 
-        # Load cached configuration if available
-        cached_config = None
-        if self.config_cache:
-            cached_config = self.config_cache.load_config()
-            if cached_config:
-                self.console.print(
-                    "[italic green]Using cached configuration from 'vydev prepare'...[/italic green]\n"
-                )
+        terraform_folder = self.queryier.ask_user_with_default_and_hint(
+            question="Where is the terraform infrastructure folder?",
+            default_query=lambda: str(
+                self.deployment_migration.find_terraform_infrastructure_folder(),
+            ),
+        )
 
-        # PHASE 2: Check AWS profiles (environment setup done in 'vydev prepare')
-        try:
-            self.deployment_migration.find_environment_aws_profile_names()
-        except NotFoundError as e:
-            self.console.print(
-                f"[bold red]Error: {e}[/bold red]\n"
-                f"Please make sure you have set up AWS CLI profiles for all AWS environments.\n"
-            )
-            return
+        repository_name = self.queryier.ask_user_with_default_and_hint(
+            question="What is the name of the service's ECR Repository?",
+            hint="ECR repo name is often found in the `service` environment of your -aws repo.",
+            default_query=lambda: self.deployment_migration.find_application_name(
+                Path(terraform_folder)
+            ),
+        )
+
+        application_name = self.queryier.ask_user_with_default_and_hint(
+            question="What is the service name?",
+            hint="Service name can be found in the Terraform file where the ECS service or Lambda function is defined.",
+            default_query=lambda: self.deployment_migration.find_application_name(
+                Path(terraform_folder)
+            ),
+        )
+
+        build_tool = self.queryier.ask_user_with_default_and_hint(
+            question="What is the application's build tool",
+            choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
+            default_query=lambda: self.deployment_migration.find_build_tool(),
+        )
+
+        runtime_target = self.queryier.ask_user_with_default_and_hint(
+            question="What is the application's runtime target",
+            choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
+            default_query=lambda: self.deployment_migration.find_aws_runtime(
+                Path(terraform_folder)
+            ),
+        )
 
         # Get environment folders for later use
         environment_folders = self.deployment_migration.find_all_environment_folders()
-
-        # Try to find terraform infrastructure folder automatically
-        # Use cached value if available, otherwise try to find it
-        if cached_config:
-            terraform_folder = cached_config.terraform_folder
-        else:
-            try:
-                terraform_folder = str(
-                    self.deployment_migration.find_terraform_infrastructure_folder()
-                )
-            except FileNotFoundError:
-                terraform_folder = None
-
-        if terraform_folder is None:
-            self.console.print(
-                "[italic blue]Hint: [/italic blue]"
-                "[italic]Terraform infrastructure folder path is the parent directory of test, stage, service and prod[/italic]"
-            )
-        terraform_folder_str = Prompt.ask(
-            "[bold]Enter the terraform infrastructure folder path[/bold]",
-            default=terraform_folder,
-        )
-        terraform_folder = Path(terraform_folder_str)
-
-        # TODO: Fix the split between application name and repo name
-        # Use cached value if available, otherwise try to find it
-        if cached_config:
-            guessed_repository_name = cached_config.repository_name
-        else:
-            try:
-                guessed_repository_name = (
-                    self.deployment_migration.find_application_name(terraform_folder)
-                )
-            except NotFoundError:
-                guessed_repository_name = None
-
-        self.console.print(hr_line)
-        if guessed_repository_name is None:
-            self.console.print(
-                "[italic blue]Hint: [/italic blue]"
-                "[italic]ECR repo name may be found in the `service` environment of your -aws repo.[/italic]"
-            )
-        repository_name = Prompt.ask(
-            "[bold]What is the name of the service's ECR Repository?[/bold]",
-            default=guessed_repository_name,
-        )
-
-        self.console.print(hr_line)
-        # Use cached application name if available
-        default_application_name = (
-            cached_config.application_name if cached_config else None
-        )
-        if not default_application_name:
-            self.console.print(
-                "[italic blue]Hint: [/italic blue]"
-                "[italic]Service name can be found in the Terraform file where the ECS service or Lambda function is defined.[/italic]"
-            )
-        application_name = Prompt.ask(
-            "[bold]What is the service name?[/bold]", default=default_application_name
-        )
-
-        # Use cached build tool if available
-        if cached_config:
-            guessed_build_tool = cached_config.build_tool
-        else:
-            try:
-                guessed_build_tool = self.deployment_migration.find_build_tool()
-            except NotFoundError:
-                guessed_build_tool = None
-
-        build_tool = None
-        while build_tool is None:
-            self.console.print(hr_line)
-            build_tool = Prompt.ask(
-                "Select the application build tool",
-                choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
-                default=guessed_build_tool,
-            )
-
-        # Use cached runtime target if available
-        if cached_config:
-            guessed_target_runtime = cached_config.runtime_target
-        else:
-            try:
-                guessed_target_runtime = self.deployment_migration.find_aws_runtime(
-                    terraform_folder
-                )
-            except NotFoundError:
-                guessed_target_runtime = None
-        runtime_target = None
-        while runtime_target is None:
-            self.console.print(hr_line)
-            runtime_target = Prompt.ask(
-                "Select the application runtime target",
-                choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
-                default=guessed_target_runtime,
-            )
-
-        # Get Service account ID for ECR repository URL replacement
-        self.console.print(hr_line)
+        self.terminal.hr_line()
         service_account_id = Prompt.ask(
             "What is the account ID of your service account?"
         )
@@ -539,7 +387,7 @@ class CLIHandler:
         changed_files = self.deployment_migration.changed_files()
         self.console.print(f"\nThe following files have changes: {changed_files}")
 
-        self.console.print(hr_line)
+        self.terminal.hr_line()
         self.console.print("\n[bold green]✅ Migration Complete![/bold green]\n")
         self.console.print("[bold]Next Steps:[/bold]\n")
         self.console.print("1. Review the changes in your working directory")
