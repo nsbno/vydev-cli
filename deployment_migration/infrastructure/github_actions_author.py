@@ -124,17 +124,6 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             gradle_folder_path=gradle_folder_path,
             aws_role_name=aws_role_name,
         )
-        jobs.pop("package")
-
-        terraform_plan_job = {
-            "uses": self._workflow("helpers", "terraform-plan", "v1"),
-            "secrets": "inherit",
-        }
-
-        if skip_service_environment:
-            terraform_plan_job["with"] = {"skip-service-environment": True}
-
-        jobs["terraform-plan"] = terraform_plan_job
 
         workflow: Dict[str, Any] = {
             "name": "Pull Request 🔨",
