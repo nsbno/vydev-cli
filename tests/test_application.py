@@ -758,13 +758,14 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
 
     # Mock update_module_versions to return updated content
     def mock_update(content, target_modules):
+        import re
         for module_source, new_version in target_modules.items():
             if module_source in content:
-                # Simple replacement for testing
-                content = content.replace(
-                    module_source.split("/")[-1] + "?ref=",
-                    module_source.split("/")[-1] + f"?ref={new_version}|",
-                ).replace("|", "")
+                # Use regex to replace the version after ?ref=
+                module_name = module_source.split("/")[-1]
+                pattern = f'{module_name}\\?ref=[^"\\s]+'
+                replacement = f'{module_name}?ref={new_version}'
+                content = re.sub(pattern, replacement, content)
         return content
 
     terraform_modifier.update_module_versions.side_effect = mock_update
@@ -789,7 +790,7 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     assert Path("terraform/template/main.tf") in written_files
 
     # Each file should have the correct version
-    assert "3.0.0-rc3" in written_files[Path("terraform/template/ecs.tf")]
+    assert "3.0.0-rc7" in written_files[Path("terraform/template/ecs.tf")]
     assert "2.0.0-beta1" in written_files[Path("terraform/template/lambda.tf")]
     assert "0.5.0" in written_files[Path("terraform/template/main.tf")]
 

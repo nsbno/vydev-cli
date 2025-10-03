@@ -356,6 +356,19 @@ class CLIHandler:
         Handle the application repo upgrade operation.
         """
         hr_line = Markdown("---")
+
+        # PHASE 1: Branch Reminder
+        self.console.print(Panel("[bold yellow]⚠️  Branch Required[/bold yellow]"))
+        self.console.print(
+            "\n[bold]Before proceeding, make sure you're on a migration branch:[/bold]\n"
+            "   [cyan]git checkout -b migrate-to-github-actions[/cyan]\n"
+        )
+        if not Confirm.ask("Are you on a migration branch?"):
+            self.console.print(
+                "[yellow]Please create a migration branch first.[/yellow]"
+            )
+            return
+
         self.console.print(Panel("[bold]Upgrade Application Repo[/bold]"))
 
         # Load cached configuration if available
@@ -367,21 +380,7 @@ class CLIHandler:
                     "[italic green]Using cached configuration from 'vydev prepare'...[/italic green]\n"
                 )
 
-        # Guide the user through the environment setup process
-        environment_folders = self.deployment_migration.find_all_environment_folders()
-        new_env_url, repo_address, accounts = (
-            self.deployment_migration.help_with_github_environment_setup(
-                environment_folders
-            )
-        )
-
-        if "Service" not in accounts:
-            # Sometimes, the user might not have a service environment set up in the repo
-            service_account_id = Prompt.ask(
-                "What is the account ID of your service account?"
-            )
-            accounts["Service"] = service_account_id
-
+        # PHASE 2: Check AWS profiles (environment setup done in 'vydev prepare')
         try:
             self.deployment_migration.find_environment_aws_profile_names()
         except NotFoundError as e:
@@ -390,6 +389,9 @@ class CLIHandler:
                 f"Please make sure you have set up AWS CLI profiles for all AWS environments.\n"
             )
             return
+
+        # Get environment folders for later use
+        environment_folders = self.deployment_migration.find_all_environment_folders()
 
         # Try to find terraform infrastructure folder automatically
         # Use cached value if available, otherwise try to find it
@@ -488,28 +490,11 @@ class CLIHandler:
                 default=guessed_target_runtime,
             )
 
+        # Get Service account ID for ECR repository URL replacement
         self.console.print(hr_line)
-        if shutil.which("gh"):
-            self.console.print(
-                "GitHub CLI is installed, using it to create GH environments."
-            )
-            self.deployment_migration.initialize_github_environments(
-                accounts, repo_address
-            )
-        else:
-            self.console.print("\n[bold]Please complete the following steps:[/bold]")
-            for env, account in accounts.items():
-                self.console.print(
-                    f"Visit {new_env_url} to set up the following environment:"
-                )
-                self.console.print(f"   - [italic]Name[/italic]: {env}")
-                self.console.print(
-                    f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
-                )
-                while not Confirm.ask("\nHave you created this environment in GH?"):
-                    self.console.print(
-                        "[bold red]Please complete the environment setup before continuing[/bold red]"
-                    )
+        service_account_id = Prompt.ask(
+            "What is the account ID of your service account?"
+        )
 
         # Upgrade terraform resources
         self.console.print(
@@ -524,16 +509,17 @@ class CLIHandler:
         self.deployment_migration.replace_image_with_ecr_repository_url(
             str(terraform_folder),
             repository_name,
-            accounts["Service"],
+            service_account_id,
         )
         self.console.print(
             "[green]Application terraform resources upgraded successfully![/green]"
         )
 
+        # PHASE 3: Generate only deployment workflow (PR workflows already exist)
         self.console.print(
             "[yellow]Creating GitHub Actions deployment workflow...[/yellow]"
         )
-        self.deployment_migration.create_github_action_deployment_workflow(
+        self.deployment_migration.generate_deployment_workflow(
             repository_name,
             application_name,
             build_tool,
@@ -549,11 +535,25 @@ class CLIHandler:
         self.deployment_migration.remove_old_deployment_setup()
         self.console.print("[green]Old deployment setup removed successfully![/green]")
 
+        # PHASE 4: Show manual git instructions
         changed_files = self.deployment_migration.changed_files()
         self.console.print(f"\nThe following files have changes: {changed_files}")
+
+        self.console.print(hr_line)
+        self.console.print("\n[bold green]✅ Migration Complete![/bold green]\n")
+        self.console.print("[bold]Next Steps:[/bold]\n")
+        self.console.print("1. Review the changes in your working directory")
+        self.console.print("2. Commit the changes:")
+        self.console.print("   [cyan]git add .[/cyan]")
         self.console.print(
-            "[bold]Please review, commit and push the changes before proceeding.[/bold]"
+            "   [cyan]git commit -m 'Migrate to GitHub Actions deployment'[/cyan]\n"
         )
+        self.console.print("3. Push to remote:")
+        self.console.print(
+            "   [cyan]git push -u origin migrate-to-github-actions[/cyan]\n"
+        )
+        self.console.print("4. Create a Pull Request on GitHub")
+        self.console.print("5. Test the deployment workflow by merging the PR\n")
 
 
 def main():
