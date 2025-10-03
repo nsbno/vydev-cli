@@ -1,9 +1,11 @@
 import abc
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Self, Any, Optional
 
+from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
 
@@ -23,6 +25,22 @@ class ApplicationBuildTool(StrEnum):
 class ApplicationRuntimeTarget(StrEnum):
     LAMBDA = "lambda"
     ECS = "ecs"
+
+
+class MigrationConfig(BaseModel):
+    """Cached configuration from vydev prepare command.
+
+    Uses Pydantic for automatic JSON serialization/deserialization.
+    """
+
+    model_config = ConfigDict(use_enum_values=False)
+
+    terraform_folder: str
+    repository_name: str
+    application_name: str
+    build_tool: ApplicationBuildTool
+    runtime_target: ApplicationRuntimeTarget
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
 class FileHandler(abc.ABC):
@@ -74,6 +92,42 @@ class VersionControl(abc.ABC):
 
     @abc.abstractmethod
     def changed_files(self) -> list[str]:
+        pass
+
+
+class ConfigCache(abc.ABC):
+    """Port for caching migration configuration."""
+
+    @abc.abstractmethod
+    def save_config(self: Self, config: MigrationConfig) -> None:
+        """Save migration configuration to cache.
+
+        Args:
+            config: Configuration to save
+
+        Raises:
+            RuntimeError: If save fails
+        """
+        pass
+
+    @abc.abstractmethod
+    def load_config(self: Self) -> Optional[MigrationConfig]:
+        """Load migration configuration from cache.
+
+        Returns:
+            Cached configuration, or None if no cache exists
+
+        Raises:
+            RuntimeError: If cache file exists but is corrupted
+        """
+        pass
+
+    @abc.abstractmethod
+    def clear_config(self: Self) -> None:
+        """Clear cached configuration.
+
+        This is useful for testing or when user wants to start fresh.
+        """
         pass
 
 
@@ -407,7 +461,7 @@ class DeploymentMigration:
         path = push_api_spec_job["documentation/push-api-spec"]["openapi-path"]
         return Path(path)
 
-    def create_github_action_deployment_workflow(
+    def generate_pr_workflows(
         self: Self,
         repository_name: str,
         application_name: str,
@@ -415,14 +469,24 @@ class DeploymentMigration:
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
     ) -> None:
-        """Creates the github action deployment workflow"""
+        """Generates only the PR and PR-comment workflows.
+
+        This is used in stage one of the migration to deploy PR workflows
+        to main branch before making other changes.
+
+        Args:
+            repository_name: Name of the ECR repository
+            application_name: Name of the application
+            application_build_tool: Build tool (PYTHON or GRADLE)
+            application_runtime_target: Runtime (LAMBDA or ECS)
+            terraform_base_folder: Base folder for Terraform config
+        """
         # Find Dockerfile if we're using ECS
         dockerfile_path = None
         if application_runtime_target == ApplicationRuntimeTarget.ECS:
             try:
                 dockerfile_path = str(self.find_dockerfile())
             except NotFoundError:
-                # If Dockerfile is not found, we'll proceed without it
                 pass
 
         # Find Gradle folder if we're using Gradle
@@ -431,9 +495,87 @@ class DeploymentMigration:
             try:
                 gradle_folder_path = str(self.find_gradle_folder())
             except NotFoundError:
-                # If Gradle folder is not found, we'll proceed without it
                 pass
 
+        # Check if service environment exists
+        skip_service_environment = not self.has_service_environment()
+
+        # Check if custom AWS role is needed
+        aws_role_name = self.get_aws_role_name()
+
+        # Generate PR workflow
+        pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
+            repository_name,
+            application_name,
+            application_build_tool,
+            application_runtime_target,
+            terraform_base_folder,
+            dockerfile_path=dockerfile_path,
+            gradle_folder_path=gradle_folder_path,
+            skip_service_environment=skip_service_environment,
+            aws_role_name=aws_role_name,
+        )
+
+        self.file_handler.create_file(
+            Path(".github/workflows/pull-request.yml"), pull_request_workflow
+        )
+
+        # Generate PR comment workflow
+        pull_request_comment_workflow = (
+            self.github_actions_author.create_pull_request_comment_workflow(
+                repository_name,
+                application_name,
+                application_build_tool,
+                application_runtime_target,
+                terraform_base_folder,
+                dockerfile_path=dockerfile_path,
+                skip_service_environment=skip_service_environment,
+                aws_role_name=aws_role_name,
+            )
+        )
+
+        self.file_handler.create_file(
+            Path(".github/workflows/pull-request-comment.yml"),
+            pull_request_comment_workflow,
+        )
+
+    def generate_deployment_workflow(
+        self: Self,
+        repository_name: str,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+    ) -> None:
+        """Generates only the deployment workflow.
+
+        This is used in stage two of the migration after PR workflows
+        are already deployed to main branch.
+
+        Args:
+            repository_name: Name of the ECR repository
+            application_name: Name of the application
+            application_build_tool: Build tool (PYTHON or GRADLE)
+            application_runtime_target: Runtime (LAMBDA or ECS)
+            terraform_base_folder: Base folder for Terraform config
+        """
+        # Find Dockerfile if we're using ECS
+        dockerfile_path = None
+        if application_runtime_target == ApplicationRuntimeTarget.ECS:
+            try:
+                dockerfile_path = str(self.find_dockerfile())
+            except NotFoundError:
+                pass
+
+        # Find Gradle folder if we're using Gradle
+        gradle_folder_path = None
+        if application_build_tool == ApplicationBuildTool.GRADLE:
+            try:
+                gradle_folder_path = str(self.find_gradle_folder())
+            except NotFoundError:
+                pass
+
+        # Find OpenAPI spec
         try:
             openapi_spec = self._find_openapi_spec()
             openapi_spec_path = str(openapi_spec) if openapi_spec else None
@@ -446,6 +588,7 @@ class DeploymentMigration:
         # Check if custom AWS role is needed
         aws_role_name = self.get_aws_role_name()
 
+        # Generate deployment workflow
         github_actions_deployment_workflow = (
             self.github_actions_author.create_deployment_workflow(
                 repository_name,
@@ -466,38 +609,37 @@ class DeploymentMigration:
             github_actions_deployment_workflow,
         )
 
-        pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
+    def create_github_action_deployment_workflow(
+        self: Self,
+        repository_name: str,
+        application_name: str,
+        application_build_tool: ApplicationBuildTool,
+        application_runtime_target: ApplicationRuntimeTarget,
+        terraform_base_folder: Path,
+    ) -> None:
+        """Creates all three GitHub Actions workflow files.
+
+        This method maintains backward compatibility by calling both
+        generate_pr_workflows() and generate_deployment_workflow().
+
+        For the new two-stage migration flow, use the separate methods instead.
+        """
+        # Generate PR workflows
+        self.generate_pr_workflows(
             repository_name,
             application_name,
             application_build_tool,
             application_runtime_target,
             terraform_base_folder,
-            dockerfile_path=dockerfile_path,
-            gradle_folder_path=gradle_folder_path,
-            skip_service_environment=skip_service_environment,
-            aws_role_name=aws_role_name,
         )
 
-        self.file_handler.create_file(
-            Path(".github/workflows/pull-request.yml"), pull_request_workflow
-        )
-
-        pull_request_comment_workflow = (
-            self.github_actions_author.create_pull_request_comment_workflow(
-                repository_name,
-                application_name,
-                application_build_tool,
-                application_runtime_target,
-                terraform_base_folder,
-                dockerfile_path=dockerfile_path,
-                skip_service_environment=skip_service_environment,
-                aws_role_name=aws_role_name,
-            )
-        )
-
-        self.file_handler.create_file(
-            Path(".github/workflows/pull-request-comment.yml"),
-            pull_request_comment_workflow,
+        # Generate deployment workflow
+        self.generate_deployment_workflow(
+            repository_name,
+            application_name,
+            application_build_tool,
+            application_runtime_target,
+            terraform_base_folder,
         )
 
     def upgrade_aws_repo_terraform_resources(

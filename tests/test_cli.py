@@ -334,3 +334,109 @@ def test_main_no_arguments(monkeypatch, string_io):
     # Verify error message
     output = string_io.getvalue()
     assert "Error: Missing argument" in output
+
+
+def test_prepare_migration_generates_pr_workflows(
+    cli_handler, mock_deployment_migration, string_io, monkeypatch
+):
+    """Test prepare command generates PR workflows only."""
+    # Mock user inputs
+    terraform_folder = Path("terraform/template")
+    mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
+        terraform_folder
+    )
+    mock_deployment_migration.find_application_name.return_value = "test-app"
+    mock_deployment_migration.find_build_tool.return_value = ApplicationBuildTool.PYTHON
+    mock_deployment_migration.find_aws_runtime.return_value = (
+        ApplicationRuntimeTarget.ECS
+    )
+    mock_deployment_migration.changed_files.return_value = [
+        ".github/workflows/pull-request.yml",
+        ".github/workflows/pull-request-comment.yml",
+    ]
+
+    # Mock environment setup
+    mock_deployment_migration.find_all_environment_folders.return_value = [
+        Path("terraform/dev"),
+        Path("terraform/test"),
+        Path("terraform/prod"),
+    ]
+    mock_deployment_migration.help_with_github_environment_setup.return_value = (
+        "https://github.com/org/repo/settings/environments",
+        "github.com/org/repo",
+        {"Dev": "111111111111", "Test": "222222222222", "Prod": "333333333333"},
+    )
+
+    # Mock the generate_pr_workflows method
+    mock_deployment_migration.generate_pr_workflows = mock.Mock()
+
+    # Mock prompts and confirm
+    def mock_prompt(*args, **kwargs):
+        prompt_text = args[0] if args else ""
+        if "name" in prompt_text:
+            return "test-app"
+        elif "build tool" in prompt_text:
+            return ApplicationBuildTool.PYTHON
+        elif "runtime" in prompt_text:
+            return ApplicationRuntimeTarget.ECS
+        elif "service account" in prompt_text.lower():
+            return "444444444444"  # Service account ID
+        else:
+            return str(terraform_folder)
+
+    monkeypatch.setattr("rich.prompt.Prompt.ask", mock_prompt)
+    monkeypatch.setattr("shutil.which", lambda x: True)  # gh CLI is available
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *args, **kwargs: True)
+
+    # Call the method
+    cli_handler.prepare_migration()
+
+    # Verify only PR workflows were generated (not full deployment)
+    mock_deployment_migration.generate_pr_workflows.assert_called_once()
+    mock_deployment_migration.create_github_action_deployment_workflow.assert_not_called()
+
+    # Verify GitHub environments were initialized (includes Service environment)
+    mock_deployment_migration.initialize_github_environments.assert_called_once_with(
+        {
+            "Dev": "111111111111",
+            "Test": "222222222222",
+            "Prod": "333333333333",
+            "Service": "444444444444",
+        },
+        "github.com/org/repo",
+    )
+
+    # Verify changed files are displayed
+    output = string_io.getvalue()
+    assert "Setup PR Workflows" in output
+    assert "Setting up GitHub Environments" in output
+    assert ".github/workflows/pull-request.yml" in output
+    assert ".github/workflows/pull-request-comment.yml" in output
+    assert "Please commit and push these changes to main branch" in output
+
+
+def test_main_prepare_operation(monkeypatch, string_io):
+    """Test main function with prepare operation."""
+    # Mock sys.argv
+    monkeypatch.setattr(sys, "argv", ["cli.py", "prepare"])
+
+    # Mock dependencies
+    mock_cli_handler = mock.Mock(spec=CLIHandler)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.CLIHandler",
+        lambda *args, **kwargs: mock_cli_handler,
+    )
+
+    # Mock Console to use StringIO
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Console",
+        lambda *args, **kwargs: Console(file=string_io, highlight=False),
+    )
+
+    # Call main
+    main()
+
+    # Verify the correct method was called
+    mock_cli_handler.prepare_migration.assert_called_once()
+    mock_cli_handler.upgrade_aws_repo.assert_not_called()
+    mock_cli_handler.upgrade_application_repo.assert_not_called()

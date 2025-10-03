@@ -1114,3 +1114,71 @@ class TestWorkflowGenerationWithCustomAWSRole:
             github_actions_author.create_pull_request_workflow.call_args.kwargs
         )
         assert call_kwargs.get("aws_role_name") == "github_actions_assume_role"
+
+
+def test_generate_pr_workflows_creates_only_pr_files(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    github_actions_author: GithubActionsAuthor,
+) -> None:
+    """PR workflow generation should create only 2 files, not 3."""
+    created_files = {}
+    file_handler.create_file.side_effect = lambda path, content: (
+        created_files.update({path: content})
+    )
+    file_handler.read_file.side_effect = FileNotFoundError()  # No .circleci
+
+    github_actions_author.create_pull_request_workflow.return_value = "pr workflow"
+    github_actions_author.create_pull_request_comment_workflow.return_value = (
+        "pr comment workflow"
+    )
+
+    application.generate_pr_workflows(
+        repository_name="test-app",
+        application_name="test-app",
+        application_build_tool=ApplicationBuildTool.PYTHON,
+        application_runtime_target=ApplicationRuntimeTarget.ECS,
+        terraform_base_folder=Path("terraform"),
+    )
+
+    # Only PR workflows created
+    assert Path(".github/workflows/pull-request.yml") in created_files
+    assert Path(".github/workflows/pull-request-comment.yml") in created_files
+    assert Path(".github/workflows/build-and-deploy.yml") not in created_files
+
+    # Deployment workflow method not called
+    github_actions_author.create_deployment_workflow.assert_not_called()
+
+
+def test_generate_deployment_workflow_creates_only_deployment_file(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    github_actions_author: GithubActionsAuthor,
+) -> None:
+    """Deployment workflow generation should create only 1 file."""
+    created_files = {}
+    file_handler.create_file.side_effect = lambda path, content: (
+        created_files.update({path: content})
+    )
+    file_handler.read_file.side_effect = FileNotFoundError()  # No .circleci
+
+    github_actions_author.create_deployment_workflow.return_value = (
+        "deployment workflow"
+    )
+
+    application.generate_deployment_workflow(
+        repository_name="test-app",
+        application_name="test-app",
+        application_build_tool=ApplicationBuildTool.PYTHON,
+        application_runtime_target=ApplicationRuntimeTarget.ECS,
+        terraform_base_folder=Path("terraform"),
+    )
+
+    # Only deployment workflow created
+    assert Path(".github/workflows/build-and-deploy.yml") in created_files
+    assert Path(".github/workflows/pull-request.yml") not in created_files
+    assert Path(".github/workflows/pull-request-comment.yml") not in created_files
+
+    # PR workflow methods not called
+    github_actions_author.create_pull_request_workflow.assert_not_called()
+    github_actions_author.create_pull_request_comment_workflow.assert_not_called()
