@@ -52,7 +52,6 @@ class CLIHandler:
     def __init__(
         self,
         deployment_migration: DeploymentMigration,
-        config_cache: ConfigCache = None,
         console: Console = None,
     ):
         """
@@ -64,7 +63,6 @@ class CLIHandler:
             console: Rich console for UI, creates a new one if not provided
         """
         self.deployment_migration = deployment_migration
-        self.config_cache = config_cache
         self.console = console or Console()
         self.terminal = Terminal(self.console)
         self.queryier = Queryier(self.terminal)
@@ -481,11 +479,8 @@ def main():
         )
     )
 
-    # Create config cache for persisting user answers
-    config_cache = JsonConfigCache()
-
     # Create an instance of CLIHandler
-    cli_handler = CLIHandler(deployment_migration, config_cache, console)
+    cli_handler = CLIHandler(deployment_migration, console)
 
     # Check if the repository is in a clean state
     if not cli_handler.check_repo_clean_state():
