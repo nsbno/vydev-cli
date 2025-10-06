@@ -197,14 +197,14 @@ class CLIHandler:
         )
 
         build_tool = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's build tool",
+            question="What is the application's build tool?",
             hint="Choose the build tool used to package and deploy the application.",
             choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
             default_query=lambda: self.deployment_migration.find_build_tool(),
         )
 
         runtime_target = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's runtime target",
+            question="What is the application's runtime target?",
             hint="Choose the runtime target for the application.",
             choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
             default_query=lambda: self.deployment_migration.find_aws_runtime(
