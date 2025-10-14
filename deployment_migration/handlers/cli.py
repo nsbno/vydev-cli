@@ -14,7 +14,6 @@ from deployment_migration.application import (
     ApplicationBuildTool,
     ApplicationRuntimeTarget,
     NotFoundError,
-    ConfigCache,
 )
 from deployment_migration.handlers.view import Queryier, Terminal
 from deployment_migration.infrastructure.file_handler import (
@@ -39,7 +38,6 @@ from deployment_migration.infrastructure.stub_handler import (
 from deployment_migration.infrastructure.application_context import (
     ApplicationContextFinder,
 )
-from deployment_migration.infrastructure.config_cache import JsonConfigCache
 
 
 class CLIHandler:
