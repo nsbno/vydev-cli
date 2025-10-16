@@ -18,7 +18,12 @@ class RegexTerraformModifier(Terraform):
         :param terraform_config: The content of the Terraform file
         :return: The modified Terraform configuration with vydev data sources removed
         """
-        vydev_pattern = r'data\s+"vydev_artifact_version"\s+"[^"]*"\s+{[^}]*}'
+        # Pattern that handles nested braces (like ${var.name})
+        # Matches: data "vy_artifact_version" "name" { ... }
+        # where { ... } can contain nested braces like ${var.foo}
+        vydev_pattern = (
+            r'data\s+"vy_artifact_version"\s+"[^"]*"\s+\{(?:[^{}]|\{[^{}]*\})*\}'
+        )
 
         # Remove all matching data blocks
         return re.sub(vydev_pattern, "", terraform_config)
@@ -63,18 +68,29 @@ class RegexTerraformModifier(Terraform):
         :param ecr_repository_data_source_name: Name of the ECR repository data source
         :return: The modified Terraform configuration with updated image tag
         """
-        # Create pattern to find the ECS module block
-        module_pattern = r'module\s+"[^"]+"\s+{[^}]*source\s*=\s*"github\.com/nsbno/terraform-aws-ecs-service[^"]*"[^}]*}'
+        # Pattern that handles nested blocks by using .*? with DOTALL and lookahead
+        # to stop at the next top-level Terraform block
+        module_pattern = (
+            r'module\s+"([^"]+)"\s+\{(.*?)\}(?=\s*(?:module|resource|data|variable|output|locals|provider|\Z))'
+        )
 
         def replace_image(match):
-            module_text = match.group(0)
+            module_name = match.group(1)
+            module_content = match.group(2)
+
+            # Check if this is an ECS service module
+            if "github.com/nsbno/terraform-aws-ecs-service" not in module_content:
+                return match.group(0)  # Return unchanged if not ECS module
+
             # Replace image line with reference to ECR repository
             new_variable = f"\n  repository_url = data.aws_ecr_repository.{ecr_repository_data_source_name}.repository_url"
             # Find and replace the image line
-            image_pattern = r'\s+image\s*=\s*"[^"]*"'
-            return re.sub(image_pattern, new_variable, module_text)
+            image_pattern = r"\s+image\s*=\s*\"[^\"]*\""
+            modified_content = re.sub(image_pattern, new_variable, module_content)
 
-        return re.sub(module_pattern, replace_image, terraform_config)
+            return f'module "{module_name}" {{{modified_content}}}'
+
+        return re.sub(module_pattern, replace_image, terraform_config, flags=re.DOTALL)
 
     def find_provider(
         self: Self, target_provider: str, terraform_folder: Path
