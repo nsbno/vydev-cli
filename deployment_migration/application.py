@@ -862,7 +862,7 @@ class DeploymentMigration:
                 main_tf_path = Path(f"{terraform_infrastructure_folder}/main.tf")
                 main_tf_config = self.file_handler.read_file(main_tf_path)
 
-                module_name = "account_metadata"
+                module_name = "metadata"
                 main_tf_config = self.terraform.add_module(
                     main_tf_config,
                     name=module_name,
