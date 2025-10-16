@@ -173,6 +173,7 @@ class CLIHandler:
         # Try to find terraform infrastructure folder automatically
         terraform_folder = self.queryier.ask_user_with_default_and_hint(
             question="Where is the terraform infrastructure folder?",
+            hint="This is typically `template/`",
             default_query=lambda: str(
                 self.deployment_migration.find_terraform_infrastructure_folder(),
             ),
@@ -304,6 +305,7 @@ class CLIHandler:
 
         terraform_folder = self.queryier.ask_user_with_default_and_hint(
             question="Where is the terraform infrastructure folder?",
+            hint="This is typically `template/`",
             default_query=lambda: str(
                 self.deployment_migration.find_terraform_infrastructure_folder(),
             ),
