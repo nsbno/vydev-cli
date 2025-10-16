@@ -63,7 +63,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         if runtime_target == ApplicationRuntimeTarget.ECS:
             with_params = {
-                "repo-name": repository_name,
+                "ecr-repo-name": repository_name,
                 "artifact-name": "${{ needs.build.outputs.artifact-name }}",
                 "artifact-path": "${{ needs.build.outputs.artifact-path }}",
             }
@@ -89,7 +89,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
                     "uses": self._workflow("package", "s3", "v1"),
                     "secrets": "inherit",
                     "with": {
-                        "repo-name": repository_name,
+                        "ecr-repo-name": repository_name,
                         "artifact-name": "${{ needs.build.outputs.artifact-name }}",
                         "artifact-path": "${{ needs.build.outputs.artifact-path }}",
                         "directory-to-zip": "${{ needs.build.outputs.artifact-path }}",
