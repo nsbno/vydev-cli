@@ -70,9 +70,7 @@ class RegexTerraformModifier(Terraform):
         """
         # Pattern that handles nested blocks by using .*? with DOTALL and lookahead
         # to stop at the next top-level Terraform block
-        module_pattern = (
-            r'module\s+"([^"]+)"\s+\{(.*?)\}(?=\s*(?:module|resource|data|variable|output|locals|provider|\Z))'
-        )
+        module_pattern = r'module\s+"([^"]+)"\s+\{(.*?)\}(?=\s*(?:module|resource|data|variable|output|locals|provider|\Z))'
 
         def replace_image(match):
             module_name = match.group(1)
@@ -83,7 +81,7 @@ class RegexTerraformModifier(Terraform):
                 return match.group(0)  # Return unchanged if not ECS module
 
             # Replace image line with reference to ECR repository
-            new_variable = f"\n  repository_url = data.aws_ecr_repository.{ecr_repository_data_source_name}.repository_url"
+            new_variable = f"\n    repository_url = data.aws_ecr_repository.{ecr_repository_data_source_name}.repository_url"
             # Find and replace the image line
             image_pattern = r"\s+image\s*=\s*\"[^\"]*\""
             modified_content = re.sub(image_pattern, new_variable, module_content)
@@ -449,36 +447,58 @@ class RegexTerraformModifier(Terraform):
             if not source_match:
                 continue
 
-            # Found the ECS module, now look for lb_listeners
-            lb_listeners_match = re.search(
-                r"lb_listeners\s*=\s*\[\s*{(.*?)}\s*\]", module_content, re.DOTALL
-            )
-            if not lb_listeners_match:
+            # Found the ECS module, now look for lb_listeners using bracket counting
+            lb_listeners_start = re.search(r"lb_listeners\s*=\s*\[", module_content)
+            if not lb_listeners_start:
                 continue
 
-            # Found lb_listeners, check if test_listener_arn already exists
-            lb_listeners_content = lb_listeners_match.group(1)
-            if "test_listener_arn" in lb_listeners_content:
+            # Check if test_listener_arn already exists
+            if "test_listener_arn" in module_content:
                 continue
 
-            # Add test_listener_arn to the lb_listeners
+            # Find the matching closing bracket for lb_listeners array
+            start_pos = lb_listeners_start.end() - 1  # Position of '['
+            bracket_count = 0
+            end_pos = -1
+
+            for i in range(start_pos, len(module_content)):
+                if module_content[i] == "[":
+                    bracket_count += 1
+                elif module_content[i] == "]":
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        end_pos = i
+                        break
+
+            if end_pos == -1:
+                continue  # Couldn't find matching bracket
+
+            # Extract the full lb_listeners declaration
+            lb_listeners_full = module_content[lb_listeners_start.start() : end_pos + 1]
+
+            # Find the first '{' inside the array to insert test_listener_arn after it
+            first_brace = lb_listeners_full.find("{")
+            if first_brace == -1:
+                continue
+
+            # Add test_listener_arn after the opening brace
             test_listener_value = (
                 f"module.{metadata_module_name}.load_balancer.https_test_listener_arn"
             )
-            # Insert test_listener_arn at the beginning of the lb_listeners content
-            modified_lb_listeners_content = f"\n    test_listener_arn = {test_listener_value}\n{lb_listeners_content}"
+            test_listener_line = f"\n      test_listener_arn = {test_listener_value}\n"
 
-            # Replace the lb_listeners content in the module
-            # Make sure to include the closing brackets }] at the end
-            full_lb_listeners = f"lb_listeners = [{{{lb_listeners_content}}}]"
-            modified_full_lb_listeners = (
-                f"lb_listeners = [{{{modified_lb_listeners_content}}}]"
+            modified_lb_listeners = (
+                lb_listeners_full[: first_brace + 1]
+                + test_listener_line
+                + lb_listeners_full[first_brace + 1 :]
             )
+
+            # Replace in module content
             modified_module_content = module_content.replace(
-                full_lb_listeners, modified_full_lb_listeners
+                lb_listeners_full, modified_lb_listeners
             )
 
-            # Replace the module content in the config
+            # Replace the module in the config
             original_module = module_match.group(0)
             modified_module = f'module "{module_name}" {{{modified_module_content}}}'
 

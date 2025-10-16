@@ -74,8 +74,8 @@ def test_create_deployment_workflow_includes_application_name(
     assert "jobs" in workflow_dict
     assert "package" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["package"]
-    assert "repo-name" in workflow_dict["jobs"]["package"]["with"]
-    assert workflow_dict["jobs"]["package"]["with"]["repo-name"] == application_name
+    assert "ecr-repo-name" in workflow_dict["jobs"]["package"]["with"]
+    assert workflow_dict["jobs"]["package"]["with"]["ecr-repo-name"] == application_name
 
     # And in deploy job
     assert "deploy" in workflow_dict["jobs"]

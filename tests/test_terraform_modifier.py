@@ -382,7 +382,7 @@ def test_add_test_listener_to_ecs_module(terraform_modifier: RegexTerraformModif
     assert "lb_listeners = [{" in result
     assert 'listener_arn      = "some-listener-arn"' in result
     assert (
-        "test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
+        "      test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
         in result
     )
 
@@ -483,7 +483,7 @@ def test_replace_image_tag_on_ecs_module(terraform_modifier: Terraform) -> None:
         'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
         '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"\n'
         '  existing_var = "existing_value"\n'
-        "  repository_url = data.aws_ecr_repository.this.repository_url\n"
+        "    repository_url = data.aws_ecr_repository.this.repository_url\n"
         '  another_existing_var = "existing_value"\n'
         "}"
     )
@@ -626,3 +626,53 @@ def test_has_module_finds_ecs_module_in_service_folder(
     )
 
     assert result is True
+
+
+def test_add_test_listener_preserves_all_content_with_nested_brackets(
+    terraform_modifier: RegexTerraformModifier,
+):
+    """Test that add_test_listener_to_ecs_module preserves all content when conditions has nested brackets."""
+    # Arrange - this is the structure that was causing the issue
+    terraform_config = """
+    module "github.com/nsbno/terraform-aws-ecs-service" {
+      source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"
+      existing_var = "existing_value"
+
+      lb_listeners = [{
+        listener_arn      = local.shared_config.alb_https_listener_arn
+        security_group_id = local.shared_config.alb_security_group_id
+        conditions = [
+          {
+            path_pattern = "/${local.base_path}/*"
+          }]
+      }]
+
+      some_other_var = "should_be_preserved"
+    }
+    """
+
+    metadata_module_name = "account_metadata"
+
+    # Act
+    result = terraform_modifier.add_test_listener_to_ecs_module(
+        terraform_config, metadata_module_name
+    )
+
+    # Assert - all original content should be preserved
+    assert 'module "github.com/nsbno/terraform-aws-ecs-service"' in result
+    assert (
+        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"'
+        in result
+    )
+    assert 'existing_var = "existing_value"' in result
+    assert "lb_listeners = [{" in result
+    assert "listener_arn      = local.shared_config.alb_https_listener_arn" in result
+    assert "security_group_id = local.shared_config.alb_security_group_id" in result
+    assert 'path_pattern = "/${local.base_path}/*"' in result
+    assert (
+        "      test_listener_arn = module.account_metadata.load_balancer.https_test_listener_arn"
+        in result
+    )
+    assert 'some_other_var = "should_be_preserved"' in result
+    # The closing brackets should be present
+    assert result.count("}]") >= 2  # One for conditions, one for lb_listeners
