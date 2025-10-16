@@ -225,7 +225,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         }
 
         workflow: Dict[str, Any] = {
-            "name": "Deployment 🚀",
+            "name": "Build & Deploy 🚀",
             "on": {"push": {"branches": ["master", "main"]}},
             "jobs": jobs,
         }
