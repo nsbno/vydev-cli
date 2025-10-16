@@ -107,6 +107,7 @@ class Queryier:
         self: Self,
         question: str,
         default_query: Callable[[], str | None],
+        return_default: bool = False,
         hint: Optional[str] = None,
         choices: Optional[list[str]] = None,
     ) -> str:
@@ -114,12 +115,15 @@ class Queryier:
         if from_cache:
             return from_cache
 
-        self.terminal.hr_line()
-
         try:
             default = default_query()
         except Exception:
             default = None
+
+        if return_default and default is not None:
+            return default
+
+        self.terminal.hr_line()
 
         if hint:
             self.terminal.hint(hint)

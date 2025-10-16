@@ -199,6 +199,9 @@ class CLIHandler:
             hint="Choose the build tool used to package and deploy the application.",
             choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
             default_query=lambda: self.deployment_migration.find_build_tool(),
+            # NOTE: There is really only one choice here.
+            #       If we find that they are using ECS, it should just work.
+            return_default=True,
         )
 
         runtime_target = self.queryier.ask_user_with_default_and_hint(
@@ -208,6 +211,9 @@ class CLIHandler:
             default_query=lambda: self.deployment_migration.find_aws_runtime(
                 Path(terraform_folder)
             ),
+            # NOTE: There is really only one choice here.
+            #       If we find that they are using ECS, it should just work.
+            return_default=True,
         )
 
         # Set up GitHub environments for PR workflows
@@ -323,6 +329,9 @@ class CLIHandler:
             question="What is the application's build tool",
             choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
             default_query=lambda: self.deployment_migration.find_build_tool(),
+            # NOTE: There is really only one choice here.
+            #       If we find that they are using ECS, it should just work.
+            return_default=True,
         )
 
         runtime_target = self.queryier.ask_user_with_default_and_hint(
@@ -331,6 +340,9 @@ class CLIHandler:
             default_query=lambda: self.deployment_migration.find_aws_runtime(
                 Path(terraform_folder)
             ),
+            # NOTE: There is really only one choice here.
+            #       If we find that they are using ECS, it should just work.
+            return_default=True,
         )
 
         # Get environment folders for later use
