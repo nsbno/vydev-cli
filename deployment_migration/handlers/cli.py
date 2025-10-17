@@ -228,6 +228,12 @@ class CLIHandler:
             )
         )
 
+        if "Service" not in accounts:
+            service_account_id = Prompt.ask(
+                "What is the account ID of your service account?"
+            )
+            accounts["Service"] = service_account_id
+
         if shutil.which("gh"):
             self.terminal.update("Creating GitHub environments using gh CLI...")
             self.deployment_migration.initialize_github_environments(
