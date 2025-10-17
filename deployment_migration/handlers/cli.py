@@ -140,7 +140,7 @@ class CLIHandler:
             self.console.print(
                 "[yellow]"
                 "ALB module was not found in the terraform infrastructure folder. "
-                "Please migrate to it manually."
+                "Please upgrade to it manually."
                 "It can be found at: https://github.com/nsbno/terraform-aws-loadbalancer"
                 "[/yellow]"
             )
@@ -155,17 +155,17 @@ class CLIHandler:
 
     def prepare_migration(self) -> None:
         """
-        Prepare migration by generating PR workflows.
+        Prepare upgrade by generating PR workflows.
 
-        This is step 1 of the two-command migration flow. It generates
+        This is step 1 of the two-command upgrade flow. It generates
         pull-request.yml and pull-request-comment.yml workflows that
-        allow testing the migration before full deployment.
+        allow testing the upgrade before full deployment.
         """
         self.terminal.heading_and_info(
             heading="Setup PR Workflows",
             info=(
                 "This step will generate PR workflows "
-                "that let you test all the migration changes safely "
+                "that let you test all the upgrade changes safely "
                 "using pull requests."
             ),
         )
@@ -285,7 +285,7 @@ class CLIHandler:
             "     [cyan]git add .github/workflows/\n"
             '     git commit -m "Add GitHub Actions PR workflows"\n'
             "     git push[/cyan]\n"
-            "  3. Run [cyan]'vydev application'[/cyan] to create the migration PR\n"
+            "  3. Run [cyan]'vydev application'[/cyan] to create the upgrade PR\n"
         )
 
     def upgrade_application_repo(self) -> None:
@@ -401,11 +401,11 @@ class CLIHandler:
         self.console.print("2. Commit the changes:")
         self.console.print("   [cyan]git add .[/cyan]")
         self.console.print(
-            "   [cyan]git commit -m 'Migrate to GitHub Actions deployment'[/cyan]\n"
+            "   [cyan]git commit -m 'Upgrade to GitHub Actions deployment'[/cyan]\n"
         )
         self.console.print("3. Push to remote:")
         self.console.print(
-            "   [cyan]git push -u origin migrate-to-github-actions[/cyan]\n"
+            "   [cyan]git push -u origin upgrade-to-github-actions[/cyan]\n"
         )
         self.console.print("4. Create a Pull Request on GitHub")
         self.console.print("5. Test the deployment workflow by merging the PR\n")
