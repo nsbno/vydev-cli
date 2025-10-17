@@ -523,6 +523,8 @@ class RegexTerraformModifier(Terraform):
         values = []
 
         for tf_file in tf_files:
+            if ".terraform" in str(tf_file):
+                continue
             with open(tf_file, "r") as f:
                 content = f.read()
                 # Pattern for both resource and data blocks
