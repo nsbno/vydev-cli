@@ -294,18 +294,9 @@ class CLIHandler:
             ),
         )
 
-        self.terminal.warn(
-            "Branch Recommended",
-            (
-                "You should be on a separate branch to avoid "
-                "accidentally merging changes to the main branch.\n"
-                "Try [italic]git checkout -b migrate-to-github-actions[/italic]"
-            ),
-        )
-
         terraform_folder = self.queryier.ask_user_with_default_and_hint(
             question="Where is the terraform infrastructure folder?",
-            hint="This is typically `template/`",
+            hint="This is typically `terraform/template/`",
             default_query=lambda: str(
                 self.deployment_migration.find_terraform_infrastructure_folder(),
             ),
@@ -313,7 +304,7 @@ class CLIHandler:
 
         repository_name = self.queryier.ask_user_with_default_and_hint(
             question="What is the name of the service's ECR Repository?",
-            hint="ECR repo name is often found in the `service` environment of your -aws repo.",
+            hint="ECR repo name is often found in the `service` folder of your `-aws` repo.",
             default_query=lambda: self.deployment_migration.find_application_name(
                 Path(terraform_folder)
             ),
@@ -321,7 +312,7 @@ class CLIHandler:
 
         application_name = self.queryier.ask_user_with_default_and_hint(
             question="What is the service name?",
-            hint="Service name can be found in the Terraform file where the ECS service or Lambda function is defined.",
+            hint=f"Service name can typically be found in `${terraform_folder}/main.tf` under the ECS service module",
             default_query=lambda: self.deployment_migration.find_application_name(
                 Path(terraform_folder)
             ),
