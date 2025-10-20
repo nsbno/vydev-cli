@@ -53,3 +53,16 @@ class LocalFileHandler(FileHandler):
             if not_found_ok:
                 return
             raise
+
+    def delete_file(self: Self, file_path: Path, not_found_ok: bool) -> None:
+        """Delete a file at the specified path."""
+        try:
+            os.remove(file_path)
+        except FileNotFoundError:
+            if not_found_ok:
+                return
+            raise
+
+    def find_files_by_pattern(self: Self, pattern: str, root_path: Path) -> list[Path]:
+        """Recursively find files matching the pattern from root_path."""
+        return list(root_path.rglob(pattern))

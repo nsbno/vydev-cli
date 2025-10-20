@@ -69,6 +69,14 @@ class FileHandler(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def delete_file(self: Self, file_path: Path, not_found_ok: bool) -> None:
+        pass
+
+    @abc.abstractmethod
+    def find_files_by_pattern(self: Self, pattern: str, root_path: Path) -> list[Path]:
+        pass
+
+    @abc.abstractmethod
     def current_folder_name(self) -> str:
         pass
 
@@ -981,6 +989,13 @@ class DeploymentMigration:
         """Removes the old deployment setup and replaces CircleCI config with no-op"""
         # Delete .deployment folder
         self.file_handler.delete_folder(Path(".deployment"), not_found_ok=True)
+
+        # Find and delete all Terraform lock files
+        terraform_lock_files = self.file_handler.find_files_by_pattern(
+            ".terraform.lock.hcl", Path(".")
+        )
+        for lock_file in terraform_lock_files:
+            self.file_handler.delete_file(lock_file, not_found_ok=True)
 
         # Replace CircleCI config with no-op config instead of deleting
         circleci_noop_config = (

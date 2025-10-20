@@ -515,7 +515,7 @@ def test_remove_old_deployment_setup(
     application: DeploymentMigration,
     file_handler: FileHandler,
 ) -> None:
-    """Test that remove_old_deployment_setup deletes .deployment and replaces .circleci/config.yml with no-op."""
+    """Test that remove_old_deployment_setup deletes .deployment, lock files, and replaces .circleci/config.yml with no-op."""
     # Expected no-op CircleCI config
     expected_circleci_config = (
         "version: 2.1\n"
@@ -529,6 +529,14 @@ def test_remove_old_deployment_setup(
         "    jobs: [no_op]\n"
     )
 
+    # Mock finding terraform lock files
+    mock_lock_files = [
+        Path("terraform/template/.terraform.lock.hcl"),
+        Path("terraform/dev/.terraform.lock.hcl"),
+        Path("terraform/prod/.terraform.lock.hcl"),
+    ]
+    file_handler.find_files_by_pattern.return_value = mock_lock_files
+
     # Call the method
     application.remove_old_deployment_setup()
 
@@ -536,6 +544,59 @@ def test_remove_old_deployment_setup(
     file_handler.delete_folder.assert_called_once_with(
         Path(".deployment"), not_found_ok=True
     )
+
+    # Verify that terraform lock files are found and deleted
+    file_handler.find_files_by_pattern.assert_called_once_with(
+        ".terraform.lock.hcl", Path(".")
+    )
+
+    # Verify each lock file is deleted
+    assert file_handler.delete_file.call_count == len(mock_lock_files)
+    for lock_file in mock_lock_files:
+        file_handler.delete_file.assert_any_call(lock_file, not_found_ok=True)
+
+    # Verify that .circleci/config.yml is overwritten with no-op config
+    file_handler.overwrite_file.assert_called_once_with(
+        Path(".circleci/config.yml"), expected_circleci_config
+    )
+
+
+def test_remove_old_deployment_setup_handles_no_lock_files(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test that remove_old_deployment_setup handles case when no terraform lock files exist."""
+    # Expected no-op CircleCI config
+    expected_circleci_config = (
+        "version: 2.1\n"
+        "\n"
+        "jobs:\n"
+        "  no_op:\n"
+        "    type: no-op\n"
+        "\n"
+        "workflows:\n"
+        "  no_op_workflow:\n"
+        "    jobs: [no_op]\n"
+    )
+
+    # Mock finding no terraform lock files
+    file_handler.find_files_by_pattern.return_value = []
+
+    # Call the method - should not raise any errors
+    application.remove_old_deployment_setup()
+
+    # Verify that .deployment folder is deleted
+    file_handler.delete_folder.assert_called_once_with(
+        Path(".deployment"), not_found_ok=True
+    )
+
+    # Verify that terraform lock files search was performed
+    file_handler.find_files_by_pattern.assert_called_once_with(
+        ".terraform.lock.hcl", Path(".")
+    )
+
+    # Verify no delete_file calls were made (no lock files to delete)
+    file_handler.delete_file.assert_not_called()
 
     # Verify that .circleci/config.yml is overwritten with no-op config
     file_handler.overwrite_file.assert_called_once_with(
