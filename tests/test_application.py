@@ -515,14 +515,32 @@ def test_remove_old_deployment_setup(
     application: DeploymentMigration,
     file_handler: FileHandler,
 ) -> None:
-    """Test that remove_old_deployment_setup correctly attempts to delete the specified folders."""
+    """Test that remove_old_deployment_setup deletes .deployment and replaces .circleci/config.yml with no-op."""
+    # Expected no-op CircleCI config
+    expected_circleci_config = (
+        "version: 2.1\n"
+        "\n"
+        "jobs:\n"
+        "  no_op:\n"
+        "    type: no-op\n"
+        "\n"
+        "workflows:\n"
+        "  no_op_workflow:\n"
+        "    jobs: [no_op]\n"
+    )
+
     # Call the method
     application.remove_old_deployment_setup()
 
-    # Verify that delete_folder was called for each folder with not_found_ok=True
-    assert file_handler.delete_folder.call_count == 2
-    file_handler.delete_folder.assert_any_call(Path(".deployment"), not_found_ok=True)
-    file_handler.delete_folder.assert_any_call(Path(".circleci"), not_found_ok=True)
+    # Verify that .deployment folder is deleted
+    file_handler.delete_folder.assert_called_once_with(
+        Path(".deployment"), not_found_ok=True
+    )
+
+    # Verify that .circleci/config.yml is overwritten with no-op config
+    file_handler.overwrite_file.assert_called_once_with(
+        Path(".circleci/config.yml"), expected_circleci_config
+    )
 
 
 def test_find_openapi_spec_returns_path_when_circleci_config_exists_with_spec(

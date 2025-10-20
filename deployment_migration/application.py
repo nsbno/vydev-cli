@@ -978,11 +978,25 @@ class DeploymentMigration:
         return new_env_url, repo_address, account_ids
 
     def remove_old_deployment_setup(self: Self) -> None:
-        """Removes the old deployment setup"""
-        folders_to_remove = [Path(".deployment"), Path(".circleci")]
+        """Removes the old deployment setup and replaces CircleCI config with no-op"""
+        # Delete .deployment folder
+        self.file_handler.delete_folder(Path(".deployment"), not_found_ok=True)
 
-        for folder in folders_to_remove:
-            self.file_handler.delete_folder(folder, not_found_ok=True)
+        # Replace CircleCI config with no-op config instead of deleting
+        circleci_noop_config = (
+            "version: 2.1\n"
+            "\n"
+            "jobs:\n"
+            "  no_op:\n"
+            "    type: no-op\n"
+            "\n"
+            "workflows:\n"
+            "  no_op_workflow:\n"
+            "    jobs: [no_op]\n"
+        )
+        self.file_handler.overwrite_file(
+            Path(".circleci/config.yml"), circleci_noop_config
+        )
 
     def commit_and_push_changes(self: Self, message: str) -> None:
         self.version_control.commit(message)
