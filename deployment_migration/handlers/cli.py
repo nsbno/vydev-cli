@@ -404,11 +404,7 @@ class CLIHandler:
             "   [cyan]git commit -m 'Upgrade to GitHub Actions deployment'[/cyan]\n"
         )
         self.console.print("3. Push to remote:")
-        self.console.print(
-            "   [cyan]git push -u origin upgrade-to-github-actions[/cyan]\n"
-        )
-        self.console.print("4. Create a Pull Request on GitHub")
-        self.console.print("5. Test the deployment workflow by merging the PR\n")
+        self.console.print("   [cyan]git push[/cyan]\n")
 
 
 def main():
