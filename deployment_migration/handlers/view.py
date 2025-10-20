@@ -41,7 +41,7 @@ class Terminal:
 
     def update(self, text: str) -> None:
         """Update the user about the current status"""
-        self.console.print(f"[blue]{text}[/blue] {text}")
+        self.console.print(f"[blue]{text}[/blue]")
 
     def warn(self, short: str, long: str) -> None:
         """Warn the user about something"""
