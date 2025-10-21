@@ -1078,3 +1078,33 @@ class DeploymentMigration:
                 raise RuntimeError(
                     f"Failed to add AWS_ACCOUNT_ID variable to environment '{environment}': {e}"
                 )
+
+    def ensure_cache_in_gitignore(self: Self) -> None:
+        """
+        Ensure .vydev-cli-cache.json is in the repository's .gitignore file.
+
+        This prevents the CLI cache file from showing up as an untracked file
+        in the user's git status.
+        """
+        gitignore_path = Path(".gitignore")
+        cache_entry = ".vydev-cli-cache.json"
+
+        # If .gitignore doesn't exist, create it with the cache entry
+        if not self.file_handler.file_exists(str(gitignore_path)):
+            self.file_handler.create_file(gitignore_path, f"{cache_entry}\n")
+            return
+
+        # Read existing .gitignore
+        existing_content = self.file_handler.read_file(gitignore_path)
+
+        # Check if entry already exists
+        if cache_entry in existing_content.split("\n"):
+            return  # Entry already exists, nothing to do
+
+        # Add entry to .gitignore
+        # Ensure existing content ends with newline before appending
+        if existing_content and not existing_content.endswith("\n"):
+            existing_content += "\n"
+
+        new_content = existing_content + f"{cache_entry}\n"
+        self.file_handler.overwrite_file(gitignore_path, new_content)

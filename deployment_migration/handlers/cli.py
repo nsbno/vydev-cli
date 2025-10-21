@@ -477,6 +477,9 @@ def main():
             github_api=github_api,
         )
 
+    # Ensure cache file is in .gitignore
+    deployment_migration.ensure_cache_in_gitignore()
+
     console.print(
         Panel.fit(
             "[bold blue]Deployment Migration[/bold blue]\n\n"

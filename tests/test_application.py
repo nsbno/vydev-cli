@@ -1263,3 +1263,63 @@ def test_generate_deployment_workflow_creates_only_deployment_file(
     # PR workflow methods not called
     github_actions_author.create_pull_request_workflow.assert_not_called()
     github_actions_author.create_pull_request_comment_workflow.assert_not_called()
+
+
+def test_ensure_cache_in_gitignore_creates_gitignore_if_not_exists(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    """Test that .gitignore is created with cache entry if it doesn't exist."""
+    file_handler.file_exists.return_value = False
+
+    application.ensure_cache_in_gitignore()
+
+    file_handler.create_file.assert_called_once_with(
+        Path(".gitignore"), ".vydev-cli-cache.json\n"
+    )
+
+
+def test_ensure_cache_in_gitignore_adds_entry_to_existing_gitignore(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    """Test that cache entry is added to existing .gitignore if not present."""
+    existing_content = "*.pyc\n__pycache__/\n"
+    file_handler.file_exists.return_value = True
+    file_handler.read_file.return_value = existing_content
+
+    application.ensure_cache_in_gitignore()
+
+    expected_content = existing_content + ".vydev-cli-cache.json\n"
+    file_handler.overwrite_file.assert_called_once_with(
+        Path(".gitignore"), expected_content
+    )
+
+
+def test_ensure_cache_in_gitignore_does_not_duplicate_entry(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    """Test that it doesn't duplicate the entry if already present."""
+    existing_content = "*.pyc\n.vydev-cli-cache.json\n__pycache__/\n"
+    file_handler.file_exists.return_value = True
+    file_handler.read_file.return_value = existing_content
+
+    application.ensure_cache_in_gitignore()
+
+    # Should not modify the file
+    file_handler.overwrite_file.assert_not_called()
+    file_handler.create_file.assert_not_called()
+
+
+def test_ensure_cache_in_gitignore_handles_missing_trailing_newline(
+    application: DeploymentMigration, file_handler: FileHandler
+):
+    """Test that it handles .gitignore files without trailing newline."""
+    existing_content = "*.pyc\n__pycache__/"  # No trailing newline
+    file_handler.file_exists.return_value = True
+    file_handler.read_file.return_value = existing_content
+
+    application.ensure_cache_in_gitignore()
+
+    expected_content = "*.pyc\n__pycache__/\n.vydev-cli-cache.json\n"
+    file_handler.overwrite_file.assert_called_once_with(
+        Path(".gitignore"), expected_content
+    )
