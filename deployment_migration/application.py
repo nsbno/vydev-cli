@@ -772,7 +772,7 @@ class DeploymentMigration:
             config = self.terraform.update_provider_versions(
                 config,
                 target_providers={
-                    "aws": "~> 6.4.0",
+                    "aws": "~> 6.17.0",
                 },
             )
             self.file_handler.overwrite_file(provider_data["file"], config)
