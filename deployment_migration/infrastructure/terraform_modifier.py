@@ -382,19 +382,37 @@ class RegexTerraformModifier(Terraform):
         :param variables: Dictionary of variables to add to the module
         :return: The modified Terraform configuration with added variables
         """
-        # Create a pattern to match the target module
-        # Use a more flexible pattern that handles different whitespace and indentation
-        module_pattern = rf'(module\s+"{re.escape(target_module)}"\s+{{[^}}]*?)(\s*}})'
+        # Find the module declaration start
+        module_start_pattern = rf'module\s+"{re.escape(target_module)}"\s+{{'
+        module_start_match = re.search(module_start_pattern, terraform_config)
 
-        # Find the module in the config
-        module_match = re.search(module_pattern, terraform_config, re.DOTALL)
-        if not module_match:
+        if not module_start_match:
             raise NotFoundError(
                 f"Could not find module '{target_module}' in the Terraform configuration"
             )
 
-        module_content = module_match.group(1)
-        module_end = module_match.group(2)
+        # Use bracket counting to find the matching closing brace
+        start_pos = module_start_match.end() - 1  # Position of opening '{'
+        bracket_count = 0
+        end_pos = -1
+
+        for i in range(start_pos, len(terraform_config)):
+            if terraform_config[i] == "{":
+                bracket_count += 1
+            elif terraform_config[i] == "}":
+                bracket_count -= 1
+                if bracket_count == 0:
+                    end_pos = i
+                    break
+
+        if end_pos == -1:
+            raise NotFoundError(
+                f"Could not find matching closing brace for module '{target_module}'"
+            )
+
+        # Extract module content
+        module_start = module_start_match.start()
+        module_content = terraform_config[start_pos + 1 : end_pos]
 
         # Build the variable assignments
         var_assignments = ""
@@ -411,11 +429,18 @@ class RegexTerraformModifier(Terraform):
             else:
                 var_assignments += f"\n  {var_name} = {var_value}"
 
-        # Insert the variables before the closing brace
-        modified_module = module_content + var_assignments + module_end
+        # Build the modified module
+        modified_module = (
+            terraform_config[module_start : start_pos + 1]
+            + module_content
+            + var_assignments
+            + "\n"
+            + terraform_config[end_pos : end_pos + 1]
+        )
 
         # Replace the module in the config
-        return terraform_config.replace(module_match.group(0), modified_module)
+        original_module = terraform_config[module_start : end_pos + 1]
+        return terraform_config.replace(original_module, modified_module)
 
     def add_test_listener_to_ecs_module(
         self: Self, terraform_config: str, metadata_module_name: str
