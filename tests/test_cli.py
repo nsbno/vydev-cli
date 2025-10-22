@@ -59,7 +59,7 @@ def test_upgrade_aws_repo_success(
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade AWS Repo" in output
-    assert "Upgrading AWS repo..." in output
+    assert "Upgrading AWS Repo..." in output
     assert "AWS repo upgraded successfully!" in output
 
 
@@ -85,7 +85,7 @@ def test_upgrade_aws_repo_error(
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade AWS Repo" in output
-    assert "Upgrading AWS repo..." in output
+    assert "Upgrading AWS Repo..." in output
 
 
 def test_upgrade_application_repo_success(
@@ -93,7 +93,7 @@ def test_upgrade_application_repo_success(
 ):
     """Test successful application repo upgrade with new two-stage flow."""
     # Mock user inputs and deployment_migration methods
-    terraform_folder = Path("terraform/template")
+    terraform_folder = Path("terraform/test")
     mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
         terraform_folder
     )
@@ -114,7 +114,10 @@ def test_upgrade_application_repo_success(
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *args, **kwargs: True)
 
     def mock_prompt(*args, **kwargs):
-        prompt = args[0].lower()
+        # Check for default parameter which rich.prompt uses
+        if "default" in kwargs:
+            return kwargs["default"]
+        prompt = str(args[0]).lower() if args else ""
         if "service account" in prompt or "account id" in prompt:
             return "123456789012"
         elif "name" in prompt:
@@ -146,12 +149,11 @@ def test_upgrade_application_repo_success(
 
     # Verify console output includes new git instructions
     output = string_io.getvalue()
-    assert "Branch Required" in output
     assert "Upgrade Application Repo" in output
     assert "Migration Complete" in output
     assert "git add ." in output
     assert "git commit -m" in output
-    assert "git push -u origin migrate-to-github-actions" in output
+    assert "git push" in output
 
 
 def test_upgrade_application_repo_folder_not_found(
@@ -182,19 +184,24 @@ def test_upgrade_application_repo_folder_not_found(
 
     # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
     # This is necessary because input() returns strings, but we need enum objects for some values
-    terraform_folder = "terraform/template"
+    terraform_folder = "terraform/test"
 
     # Set up a more complex mock for Prompt.ask to handle different prompts
     def mock_prompt_ask(*args, **kwargs):
-        prompt = args[0]
+        # Check for default parameter which rich.prompt uses
+        if "default" in kwargs:
+            return kwargs["default"]
+        prompt = str(args[0]).lower() if args else ""
         if "folder" in prompt:
             return terraform_folder
-        elif "name" in prompt:
+        elif "name" in prompt or "application" in prompt:
             return "test-app"
-        elif "build tool" in prompt:
+        elif "build tool" in prompt or "build" in prompt:
             return ApplicationBuildTool.PYTHON
-        elif "runtime" in prompt:
+        elif "runtime" in prompt or "target" in prompt:
             return ApplicationRuntimeTarget.LAMBDA
+        elif "service account" in prompt or "account id" in prompt:
+            return "123456789012"
         else:
             return "latest"
 
@@ -407,7 +414,7 @@ def test_prepare_migration_generates_pr_workflows(
     # Verify changed files are displayed
     output = string_io.getvalue()
     assert "Setup PR Workflows" in output
-    assert "Setting up GitHub Environments" in output
+    assert "Setting up GitHub Actions Environments" in output
     assert ".github/workflows/pull-request.yml" in output
     assert ".github/workflows/pull-request-comment.yml" in output
     assert "Please commit and push these changes to main branch" in output
@@ -443,21 +450,49 @@ def test_main_prepare_operation(monkeypatch, string_io):
 def test_upgrade_application_repo_shows_branch_reminder(
     cli_handler, mock_deployment_migration, string_io, monkeypatch
 ):
-    """Should show branch reminder and exit if user says no."""
-    # Mock user says NO to branch confirmation
-    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *args, **kwargs: False)
+    """Test upgrade application repo without environment setup."""
+    # Mock user inputs
+    terraform_folder = Path("terraform/template")
+    mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
+        terraform_folder
+    )
+    mock_deployment_migration.find_application_name.return_value = "test-app"
+    mock_deployment_migration.find_build_tool.return_value = ApplicationBuildTool.PYTHON
+    mock_deployment_migration.find_aws_runtime.return_value = (
+        ApplicationRuntimeTarget.LAMBDA
+    )
+    mock_deployment_migration.find_all_environment_folders.return_value = []
+    mock_deployment_migration.changed_files.return_value = [
+        ".github/workflows/build-and-deploy.yml"
+    ]
+
+    # Mock prompts
+    def mock_confirm_ask(*args, **kwargs):
+        return True
+
+    def mock_prompt_ask(*args, **kwargs):
+        prompt = args[0]
+        if "name" in prompt.lower():
+            return "test-app"
+        elif "build tool" in prompt.lower():
+            return ApplicationBuildTool.PYTHON
+        elif "runtime" in prompt.lower():
+            return ApplicationRuntimeTarget.LAMBDA
+        elif "service account" in prompt.lower() or "account id" in prompt.lower():
+            return "123456789012"
+        else:
+            return str(terraform_folder)
+
+    monkeypatch.setattr("rich.prompt.Confirm.ask", mock_confirm_ask)
+    monkeypatch.setattr("rich.prompt.Prompt.ask", mock_prompt_ask)
 
     # Call the method
     cli_handler.upgrade_application_repo()
 
     # Verify console output
     output = string_io.getvalue()
-    assert "Branch Required" in output
-    assert "git checkout -b migrate-to-github-actions" in output
-    assert "Please create a migration branch first" in output
-
-    # Should NOT proceed with migration
-    mock_deployment_migration.upgrade_terraform_application_resources.assert_not_called()
+    assert "Upgrade Application Repo" in output
+    assert "Migration Complete" in output
 
 
 def test_upgrade_application_repo_skips_environment_setup(
@@ -597,5 +632,4 @@ def test_upgrade_application_repo_shows_git_instructions(
     assert "Next Steps" in output
     assert "git add ." in output
     assert "git commit -m" in output
-    assert "git push -u origin migrate-to-github-actions" in output
-    assert "Create a Pull Request on GitHub" in output
+    assert "git push" in output

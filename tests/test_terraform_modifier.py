@@ -493,12 +493,12 @@ def test_replace_image_tag_on_ecs_module(terraform_modifier: Terraform) -> None:
 
 def test_remove_vydev_artifacts(terraform_modifier: Terraform) -> None:
     terraform_config = (
-        'data "vydev_artifact_version" "this" {\n'
-        '  name = "test\n'
+        'data "vy_artifact_version" "this" {\n'
+        '  name = "test"\n'
         "}\n"
         "\n"
         'data "vydev_cognito_info" "this" {\n'
-        '  name = "test\n'
+        '  name = "test"\n'
         "}\n"
         "\n"
         'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
@@ -510,7 +510,7 @@ def test_remove_vydev_artifacts(terraform_modifier: Terraform) -> None:
     expected_config = (
         "\n\n"
         'data "vydev_cognito_info" "this" {\n'
-        '  name = "test\n'
+        '  name = "test"\n'
         "}\n"
         "\n"
         'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
