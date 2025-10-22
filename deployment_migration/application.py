@@ -837,7 +837,7 @@ class DeploymentMigration:
             "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc11",
             # TODO: This is not released yet
             "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
-            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "utviklerplattform",
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "3.0.0-rc1",
             "github.com/nsbno/terraform-aws-account-metadata": "0.5.0",
         }
 
