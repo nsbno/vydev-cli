@@ -676,3 +676,101 @@ def test_add_test_listener_preserves_all_content_with_nested_brackets(
     assert 'some_other_var = "should_be_preserved"' in result
     # The closing brackets should be present
     assert result.count("}]") >= 2  # One for conditions, one for lb_listeners
+
+
+def test_add_force_new_deployment_to_ecs_module(
+    terraform_modifier: RegexTerraformModifier,
+):
+    """Test that add_force_new_deployment_to_ecs_module adds force_new_deployment = true to the ECS module."""
+    # Arrange
+    terraform_config = """
+    module "ecs_service" {
+      source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"
+      existing_var = "existing_value"
+
+      lb_listeners = [{
+        listener_arn      = "some-listener-arn"
+        security_group_id = "some-security-group-id"
+      }]
+    }
+    """
+
+    # Act
+    result = terraform_modifier.add_force_new_deployment_to_ecs_module(terraform_config)
+
+    # Assert
+    assert 'module "ecs_service"' in result
+    assert (
+        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"' in result
+    )
+    assert 'existing_var = "existing_value"' in result
+    assert "force_new_deployment = true" in result
+    assert "lb_listeners = [{" in result  # Ensure existing content is preserved
+
+
+def test_add_force_new_deployment_raises_error_when_no_ecs_module(
+    terraform_modifier: RegexTerraformModifier,
+):
+    """Test that add_force_new_deployment_to_ecs_module raises NotFoundError when no ECS module exists."""
+    # Arrange - config with no ECS module
+    terraform_config = """
+    module "lambda_function" {
+      source = "github.com/nsbno/terraform-aws-lambda?ref=2.0.0"
+      function_name = "my-function"
+    }
+    """
+
+    # Act & Assert
+    from deployment_migration.application import NotFoundError
+
+    with pytest.raises(NotFoundError, match="No ECS module was found"):
+        terraform_modifier.add_force_new_deployment_to_ecs_module(terraform_config)
+
+
+def test_add_force_new_deployment_with_nested_blocks(
+    terraform_modifier: RegexTerraformModifier,
+):
+    """Test that force_new_deployment is added at module level, not inside nested blocks."""
+    # Arrange - module with nested blocks like datadog_options
+    terraform_config = """
+module "service" {
+  source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"
+  service_name = "my-service"
+
+  datadog_options = {
+    trace_partial_flush_min_spans = 2000
+  }
+
+  application_container = {
+    name = "my-app"
+    port = 8080
+  }
+}
+"""
+
+    # Act
+    result = terraform_modifier.add_force_new_deployment_to_ecs_module(terraform_config)
+
+    # Assert - force_new_deployment should be at module level, not inside nested blocks
+    assert "force_new_deployment = true" in result
+
+    # Verify the structure is correct - force_new_deployment should be a direct child of module
+    lines = result.split("\n")
+    force_deployment_line = [
+        i for i, line in enumerate(lines) if "force_new_deployment" in line
+    ][0]
+
+    # The line should have 2 spaces of indentation (module level)
+    assert lines[force_deployment_line].startswith(
+        "  force_new_deployment"
+    ), f"force_new_deployment should be at module level (2 spaces), got: '{lines[force_deployment_line]}'"
+
+    # Make sure it's NOT indented 4+ spaces (which would indicate it's inside a nested block)
+    assert not lines[force_deployment_line].startswith(
+        "    force_new_deployment"
+    ), "force_new_deployment should not be inside a nested block (4+ spaces)"
+
+    # Verify the nested blocks are still intact and properly formatted
+    assert "datadog_options = {" in result
+    assert "trace_partial_flush_min_spans = 2000" in result
+    assert "application_container = {" in result

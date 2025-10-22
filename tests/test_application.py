@@ -349,7 +349,7 @@ class TestAWSProviderUpgrade:
         )
 
         for call in terraform_modifier.update_provider_versions.mock_calls:
-            assert call.kwargs["target_providers"] == {"aws": "~> 6.4.0"}
+            assert call.kwargs["target_providers"] == {"aws": "~> 6.17.0"}
 
     def test_uses_correct_provider_file_for_provider_upgrade(
         self: Self,
@@ -685,6 +685,9 @@ def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
     terraform_modifier.add_test_listener_to_ecs_module.return_value = (
         service_tf_content.replace("2.0.0", "3.0.0-rc3")
     )
+    terraform_modifier.add_force_new_deployment_to_ecs_module.return_value = (
+        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+    )
 
     written_files = {}
     file_handler.overwrite_file.side_effect = lambda path, content: (
@@ -743,6 +746,50 @@ def test_replace_image_with_ecr_when_ecs_in_separate_file(
     # Should write to ecs.tf, NOT main.tf
     assert "terraform/template/ecs.tf" in written_files
     assert "repository_url" in written_files["terraform/template/ecs.tf"]
+
+
+def test_upgrade_terraform_application_adds_force_new_deployment(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+    terraform_modifier: Terraform,
+) -> None:
+    """Test that upgrade_terraform_application_resources adds force_new_deployment to ECS module."""
+    # Setup: ECS module exists
+    terraform_modifier.has_module.return_value = True
+    terraform_modifier.find_module.side_effect = lambda source, folder: {
+        "github.com/nsbno/terraform-aws-ecs-service": {
+            "name": "ecs_service",
+            "file_path": Path("terraform/template/service.tf"),
+            "source": "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0",
+        },
+        "github.com/nsbno/terraform-aws-account-metadata": {
+            "name": "metadata",
+            "file_path": Path("terraform/template/main.tf"),
+            "source": "github.com/nsbno/terraform-aws-account-metadata?ref=0.5.0",
+        },
+    }.get(source)
+
+    service_tf_content = (
+        'module "ecs_service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0"\n'
+        "}\n"
+    )
+    file_handler.read_file.return_value = service_tf_content
+    terraform_modifier.update_module_versions.return_value = service_tf_content.replace(
+        "2.0.0", "3.0.0-rc9"
+    )
+    terraform_modifier.add_test_listener_to_ecs_module.return_value = (
+        service_tf_content.replace("2.0.0", "3.0.0-rc9")
+    )
+    terraform_modifier.add_force_new_deployment_to_ecs_module.return_value = (
+        service_tf_content.replace("2.0.0", "3.0.0-rc9")
+        + "  force_new_deployment = true\n"
+    )
+
+    application.upgrade_terraform_application_resources("terraform/template")
+
+    # Verify that add_force_new_deployment_to_ecs_module was called
+    terraform_modifier.add_force_new_deployment_to_ecs_module.assert_called_once()
 
 
 def test_upgrade_aws_repo_when_oidc_module_in_separate_file(
@@ -851,6 +898,9 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     terraform_modifier.update_module_versions.side_effect = mock_update
     terraform_modifier.add_test_listener_to_ecs_module.side_effect = (
         lambda config, **_: config
+    )
+    terraform_modifier.add_force_new_deployment_to_ecs_module.side_effect = (
+        lambda config: config
     )
 
     written_files = {}

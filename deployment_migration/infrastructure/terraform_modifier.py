@@ -532,6 +532,47 @@ class RegexTerraformModifier(Terraform):
         # If we didn't find the module or lb_listeners, return the original config
         return terraform_config
 
+    def add_force_new_deployment_to_ecs_module(
+        self: Self, terraform_config: str
+    ) -> str:
+        """
+        Add force_new_deployment = true to the ECS module configuration.
+
+        This ensures that ECS tasks are redeployed when the Terraform configuration changes.
+
+        :param terraform_config: The content of the Terraform file
+        :return: The modified Terraform configuration with force_new_deployment added
+        """
+        # Find the ECS module in the config to get its name
+        target_module_source = "github.com/nsbno/terraform-aws-ecs-service"
+        module_pattern = (
+            r'module\s+"([^"]+)"\s+{(.*?)}(?=\s*(?:module|resource|data|provider|\Z))'
+        )
+
+        for module_match in re.finditer(module_pattern, terraform_config, re.DOTALL):
+            module_name = module_match.group(1)
+            module_content = module_match.group(2)
+
+            # Check if this is the ECS module
+            source_match = re.search(
+                rf'source\s*=\s*"{re.escape(target_module_source)}(?:\?ref=[^"]*)?',
+                module_content,
+            )
+            if not source_match:
+                continue
+
+            # Check if force_new_deployment already exists
+            if "force_new_deployment" in module_content:
+                return terraform_config
+
+            # Use add_variable to add force_new_deployment = true
+            return self.add_variable(
+                terraform_config, module_name, {"force_new_deployment": True}
+            )
+
+        # If we didn't find the ECS module, raise an error
+        raise NotFoundError("No ECS module was found in the configuration.")
+
     def get_parameter(
         self, type_: str, parameter: str, module_folder: Path
     ) -> list[str]:

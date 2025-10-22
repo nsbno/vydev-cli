@@ -241,6 +241,17 @@ class Terraform(abc.ABC):
     ) -> str:
         pass
 
+    @abc.abstractmethod
+    def add_force_new_deployment_to_ecs_module(
+        self: Self,
+        terraform_config: str,
+    ) -> str:
+        """Add force_new_deployment = true to the ECS module in a Terraform configuration.
+
+        This ensures that ECS tasks are redeployed when the Terraform configuration changes.
+        """
+        pass
+
 
 class AWS(abc.ABC):
     @abc.abstractmethod
@@ -888,6 +899,10 @@ class DeploymentMigration:
             ecs_config = self.terraform.add_test_listener_to_ecs_module(
                 ecs_config,
                 metadata_module_name=module_name,
+            )
+            # Add force_new_deployment to ECS module
+            ecs_config = self.terraform.add_force_new_deployment_to_ecs_module(
+                ecs_config
             )
             self.file_handler.overwrite_file(ecs_file_path, ecs_config)
 
