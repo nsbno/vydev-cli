@@ -349,7 +349,7 @@ class TestAWSProviderUpgrade:
         )
 
         for call in terraform_modifier.update_provider_versions.mock_calls:
-            assert call.kwargs["target_providers"] == {"aws": "~> 6.17.0"}
+            assert call.kwargs["target_providers"] == {"aws": "=> 6.15.0, < 7.0.0"}
 
     def test_uses_correct_provider_file_for_provider_upgrade(
         self: Self,
