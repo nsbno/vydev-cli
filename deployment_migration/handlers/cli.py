@@ -318,7 +318,7 @@ class CLIHandler:
 
         application_name = self.queryier.ask_user_with_default_and_hint(
             question="What is the service name?",
-            hint=f"Service name can typically be found in `${terraform_folder}/main.tf` under the ECS service module",
+            hint=f"Service name can typically be found in `{terraform_folder}/main.tf` under the ECS service module",
             default_query=lambda: self.deployment_migration.find_application_name(
                 Path(terraform_folder)
             ),
