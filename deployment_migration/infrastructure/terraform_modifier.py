@@ -545,13 +545,32 @@ class RegexTerraformModifier(Terraform):
         """
         # Find the ECS module in the config to get its name
         target_module_source = "github.com/nsbno/terraform-aws-ecs-service"
-        module_pattern = (
-            r'module\s+"([^"]+)"\s+{(.*?)}(?=\s*(?:module|resource|data|provider|\Z))'
-        )
 
-        for module_match in re.finditer(module_pattern, terraform_config, re.DOTALL):
+        # Find all module declarations using regex
+        module_start_pattern = r'module\s+"([^"]+)"\s+\{'
+
+        for module_match in re.finditer(module_start_pattern, terraform_config):
             module_name = module_match.group(1)
-            module_content = module_match.group(2)
+            start_pos = module_match.end() - 1  # Position of opening '{'
+
+            # Use bracket counting to find the matching closing brace
+            bracket_count = 0
+            end_pos = -1
+
+            for i in range(start_pos, len(terraform_config)):
+                if terraform_config[i] == "{":
+                    bracket_count += 1
+                elif terraform_config[i] == "}":
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        end_pos = i
+                        break
+
+            if end_pos == -1:
+                continue  # Couldn't find matching bracket
+
+            # Extract module content
+            module_content = terraform_config[start_pos + 1 : end_pos]
 
             # Check if this is the ECS module
             source_match = re.search(

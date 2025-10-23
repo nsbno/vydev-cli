@@ -774,3 +774,90 @@ module "service" {
     assert "datadog_options = {" in result
     assert "trace_partial_flush_min_spans = 2000" in result
     assert "application_container = {" in result
+
+
+def test_add_force_new_deployment_ignores_non_ecs_modules_with_comment_between(
+    terraform_modifier: RegexTerraformModifier,
+):
+    """Test that add_force_new_deployment only affects ECS module when comment exists between modules."""
+    # Arrange - this reproduces the bug where datadog_service gets force_new_deployment
+    terraform_config = """
+module "datadog_service" {
+  source = "github.com/nsbno/terraform-datadog-service?ref=0.0.5"
+
+  service_name  = "$${var.name_prefix}-$${var.application_name}"
+  display_name  = "$${var.name_prefix}-$${var.application_name}"
+  description   = "Microservice backend for Vedlikeholdstjenester"
+  github_url    = "https://github.com/nsbno/rollingstock-vehicle-maintenance-backend"
+  support_email = "team-kjoretoy@vy.no"
+  slack_url     = "https://nsb-utvikling.slack.com/archives/C02A5RQ1A12"
+}
+
+/*
+ * == Application
+ */
+module "service" {
+  source                          = "github.com/nsbno/terraform-aws-ecs-service?ref=1.0.1"
+  service_name                    = "module.datadog_service.service_name"
+  vpc_id                          = "nonsensitive(local.shared_config.shared_network_vpc_id)"
+  private_subnet_ids              = "nonsensitive(local.shared_config.shared_network_private_subnet_ids)"
+  cluster_id                      = "nonsensitive(local.shared_config.ecs_cluster_id)"
+  enable_datadog                  = true
+  datadog_instrumentation_runtime = "jvm"
+  wait_for_steady_state           = true
+
+  cpu    = 512
+  memory = 1024
+
+  application_container = {
+    name     = "main"
+    image    = "$${data.vy_artifact_version.this.store}/$${data.vy_artifact_version.this.path}@$${data.vy_artifact_version.this.version}"
+    port     = 8080
+    protocol = "HTTP"
+
+    environment = {
+      MICRONAUT_ENVIRONMENTS = "cloud,ec2"
+    }
+  }
+
+  lb_listeners = [{
+    listener_arn      = "nonsensitive(local.shared_config.shared_network_lb_listener_arn)"
+    security_group_id = "local.shared_config.shared_network_lb_security_group_id"
+    conditions = [{
+      path_pattern = "/$${var.application_name}/*"
+    }]
+  }]
+
+  lb_health_check = {
+    path = "/$${var.application_name}/health"
+  }
+}
+"""
+
+    # Act
+    result = terraform_modifier.add_force_new_deployment_to_ecs_module(terraform_config)
+
+    # Assert
+    # force_new_deployment should be added to the ECS service module
+    assert 'module "service"' in result
+    assert "force_new_deployment = true" in result
+
+    # Extract just the datadog_service module to check it wasn't modified
+    datadog_start = result.find('module "datadog_service"')
+    datadog_end = result.find(
+        "/*", datadog_start
+    )  # Find the comment after datadog module
+    datadog_module = result[datadog_start:datadog_end]
+
+    # force_new_deployment should NOT be in the datadog_service module
+    assert (
+        "force_new_deployment" not in datadog_module
+    ), "force_new_deployment should not be added to datadog_service module"
+
+    # Verify the datadog module is still intact and unchanged
+    assert (
+        'source = "github.com/nsbno/terraform-datadog-service?ref=0.0.5"'
+        in datadog_module
+    )
+    assert "service_name" in datadog_module
+    assert "display_name" in datadog_module
