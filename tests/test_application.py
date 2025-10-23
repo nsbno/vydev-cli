@@ -624,6 +624,27 @@ def test_find_openapi_spec_returns_path_when_circleci_config_exists_with_spec(
     file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))
 
 
+def test_find_open_api_spec_handles_other_non_workflow_jobs(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test _find_openapi_spec handles other non-workflow jobs."""
+    circleci_config = (
+        "workflows:\n"
+        "  version: 2\n"
+        "  deploy:\n"
+        "    jobs:\n"
+        "      - documentation/push-api-spec:\n"
+        '          openapi-path: "src/main/resources/openapi.yaml"\n'
+    )
+    file_handler.read_file.return_value = circleci_config
+
+    result = application._find_openapi_spec()
+
+    assert result == Path("src/main/resources/openapi.yaml")
+    file_handler.read_file.assert_called_once_with(Path(".circleci/config.yml"))
+
+
 def test_find_openapi_spec_returns_none_when_circleci_config_exists_without_spec(
     application: DeploymentMigration,
     file_handler: FileHandler,
