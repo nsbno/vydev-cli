@@ -941,7 +941,7 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     assert Path("terraform/template/main.tf") in written_files
 
     # Each file should have the correct version
-    assert "3.0.0-rc12" in written_files[Path("terraform/template/ecs.tf")]
+    assert "3.0.0-rc13" in written_files[Path("terraform/template/ecs.tf")]
     assert "2.0.0-beta1" in written_files[Path("terraform/template/lambda.tf")]
     assert "0.5.0" in written_files[Path("terraform/template/main.tf")]
 

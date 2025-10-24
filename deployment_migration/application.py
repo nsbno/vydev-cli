@@ -835,7 +835,7 @@ class DeploymentMigration:
     ) -> None:
         """Upgrades the ECS and Lambda modules"""
         target_modules = {
-            "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc12",
+            "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc13",
             # TODO: This is not released yet
             "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
             "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "3.0.0-rc1",
