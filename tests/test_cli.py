@@ -633,3 +633,131 @@ def test_upgrade_application_repo_shows_git_instructions(
     assert "git add ." in output
     assert "git commit -m" in output
     assert "git push" in output
+
+
+def test_prepare_migration_uses_gradle_and_ecs_without_prompting(
+    cli_handler, mock_deployment_migration, string_io, monkeypatch
+):
+    """Test that prepare command hardcodes GRADLE and ECS without prompting user."""
+    # Mock user inputs
+    terraform_folder = Path("terraform/template")
+    mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
+        terraform_folder
+    )
+    mock_deployment_migration.find_application_name.return_value = "test-app"
+    mock_deployment_migration.find_all_environment_folders.return_value = [
+        Path("terraform/dev"),
+        Path("terraform/test"),
+        Path("terraform/prod"),
+    ]
+    mock_deployment_migration.help_with_github_environment_setup.return_value = (
+        "https://github.com/org/repo/settings/environments",
+        "github.com/org/repo",
+        {"Dev": "111111111111", "Test": "222222222222", "Prod": "333333333333"},
+    )
+    mock_deployment_migration.changed_files.return_value = [
+        ".github/workflows/pull-request.yml",
+        ".github/workflows/pull-request-comment.yml",
+    ]
+
+    # Mock the generate_pr_workflows method
+    mock_deployment_migration.generate_pr_workflows = mock.Mock()
+
+    # Track what prompts were asked
+    prompted_questions = []
+
+    def mock_prompt(*args, **kwargs):
+        prompt_text = args[0] if args else ""
+        prompted_questions.append(prompt_text)
+        if "name" in prompt_text.lower():
+            return "test-app"
+        elif "service account" in prompt_text.lower():
+            return "444444444444"
+        elif "terraform" in prompt_text.lower() or "folder" in prompt_text.lower():
+            return str(terraform_folder)
+        else:
+            return "default"
+
+    monkeypatch.setattr("rich.prompt.Prompt.ask", mock_prompt)
+    monkeypatch.setattr("shutil.which", lambda x: True)
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *args, **kwargs: True)
+    # Mock the query cache to avoid cached values interfering
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.QueryCache.get",
+        lambda self, key, default=None: default,
+    )
+
+    # Call the method
+    cli_handler.prepare_migration()
+
+    # Verify that build tool and runtime target were NOT prompted
+    assert not any("build tool" in q.lower() for q in prompted_questions)
+    assert not any("runtime" in q.lower() for q in prompted_questions)
+
+    # Verify the PR workflows were generated with GRADLE and ECS
+    mock_deployment_migration.generate_pr_workflows.assert_called_once_with(
+        repository_name="test-app",
+        application_name="test-app",
+        application_build_tool=ApplicationBuildTool.GRADLE,
+        application_runtime_target=ApplicationRuntimeTarget.ECS,
+        terraform_base_folder=str(terraform_folder),
+    )
+
+
+def test_upgrade_application_repo_uses_gradle_and_ecs_without_prompting(
+    cli_handler, mock_deployment_migration, string_io, monkeypatch
+):
+    """Test that upgrade command hardcodes GRADLE and ECS without prompting user."""
+    # Mock user inputs
+    terraform_folder = Path("terraform/template")
+    mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
+        terraform_folder
+    )
+    mock_deployment_migration.find_application_name.return_value = "test-app"
+    mock_deployment_migration.find_all_environment_folders.return_value = []
+    mock_deployment_migration.changed_files.return_value = [
+        ".github/workflows/build-and-deploy.yml"
+    ]
+
+    # Mock generate_deployment_workflow
+    mock_deployment_migration.generate_deployment_workflow = mock.Mock()
+
+    # Track what prompts were asked
+    prompted_questions = []
+
+    def mock_prompt(*args, **kwargs):
+        prompt_text = args[0] if args else ""
+        prompted_questions.append(prompt_text)
+        if "name" in prompt_text.lower():
+            return "test-app"
+        elif (
+            "service account" in prompt_text.lower()
+            or "account id" in prompt_text.lower()
+        ):
+            return "123456789012"
+        else:
+            return str(terraform_folder)
+
+    monkeypatch.setattr("rich.prompt.Prompt.ask", mock_prompt)
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *args, **kwargs: True)
+    # Mock the query cache to avoid cached values interfering
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.QueryCache.get",
+        lambda self, key, default=None: default,
+    )
+
+    # Call the method
+    cli_handler.upgrade_application_repo()
+
+    # Verify that build tool and runtime target were NOT prompted
+    assert not any("build tool" in q.lower() for q in prompted_questions)
+    assert not any("runtime" in q.lower() for q in prompted_questions)
+
+    # Verify the deployment workflow was generated with GRADLE and ECS
+    mock_deployment_migration.generate_deployment_workflow.assert_called_once_with(
+        "test-app",  # repository_name
+        "test-app",  # application_name
+        ApplicationBuildTool.GRADLE,
+        ApplicationRuntimeTarget.ECS,
+        str(terraform_folder),
+    )

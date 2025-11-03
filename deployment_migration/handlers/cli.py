@@ -195,27 +195,9 @@ class CLIHandler:
             ),
         )
 
-        build_tool = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's build tool?",
-            hint="Choose the build tool used to package and deploy the application.",
-            choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
-            default_query=lambda: self.deployment_migration.find_build_tool(),
-            # NOTE: There is really only one choice here.
-            #       If we find that they are using ECS, it should just work.
-            return_default=True,
-        )
-
-        runtime_target = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's runtime target?",
-            hint="Choose the runtime target for the application.",
-            choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
-            default_query=lambda: self.deployment_migration.find_aws_runtime(
-                Path(terraform_folder)
-            ),
-            # NOTE: There is really only one choice here.
-            #       If we find that they are using ECS, it should just work.
-            return_default=True,
-        )
+        # Hardcoded to GRADLE and ECS - these are the only supported options
+        build_tool = ApplicationBuildTool.GRADLE
+        runtime_target = ApplicationRuntimeTarget.ECS
 
         # Set up GitHub environments for PR workflows
         self.terminal.hr_line()
@@ -324,25 +306,9 @@ class CLIHandler:
             ),
         )
 
-        build_tool = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's build tool",
-            choices=[ApplicationBuildTool.GRADLE, ApplicationBuildTool.PYTHON],
-            default_query=lambda: self.deployment_migration.find_build_tool(),
-            # NOTE: There is really only one choice here.
-            #       If we find that they are using ECS, it should just work.
-            return_default=True,
-        )
-
-        runtime_target = self.queryier.ask_user_with_default_and_hint(
-            question="What is the application's runtime target",
-            choices=[ApplicationRuntimeTarget.LAMBDA, ApplicationRuntimeTarget.ECS],
-            default_query=lambda: self.deployment_migration.find_aws_runtime(
-                Path(terraform_folder)
-            ),
-            # NOTE: There is really only one choice here.
-            #       If we find that they are using ECS, it should just work.
-            return_default=True,
-        )
+        # Hardcoded to GRADLE and ECS - these are the only supported options
+        build_tool = ApplicationBuildTool.GRADLE
+        runtime_target = ApplicationRuntimeTarget.ECS
 
         # Get environment folders for later use
         environment_folders = self.deployment_migration.find_all_environment_folders()
