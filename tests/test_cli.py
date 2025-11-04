@@ -15,6 +15,18 @@ from deployment_migration.application import (
 
 
 @pytest.fixture
+def remove_cache_file():
+    cache_file = Path(".vydev-cli-cache.json")
+    if cache_file.exists():
+        cache_file.unlink()
+
+    yield
+
+    if cache_file.exists():
+        cache_file.unlink()
+
+
+@pytest.fixture
 def mock_deployment_migration():
     """Create a mock DeploymentMigration instance."""
     return mock.Mock(spec=DeploymentMigration)

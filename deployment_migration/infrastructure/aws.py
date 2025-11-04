@@ -7,7 +7,7 @@ from deployment_migration.application import AWS
 import boto3
 
 
-class AWSAWS(AWS):
+class AWSClient(AWS):
     """Implementation of ParameterStore that interacts with AWS SSM Parameter Store."""
 
     def __init__(self: Self, client: Optional["boto3.client"] = None):

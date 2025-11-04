@@ -23,8 +23,8 @@ from deployment_migration.infrastructure.github_actions_author import (
     YAMLGithubActionsAuthor,
 )
 from deployment_migration.infrastructure.github_api import GithubApiImplementation
-from deployment_migration.infrastructure.parameter_store import (
-    AWSAWS,
+from deployment_migration.infrastructure.aws import (
+    AWSClient,
 )
 from deployment_migration.infrastructure.terraform_modifier import (
     RegexTerraformModifier,
@@ -210,8 +210,10 @@ class CLIHandler:
         )
 
         if "Service" not in accounts:
-            service_account_id = Prompt.ask(
-                "What is the account ID of your service account?"
+            service_account_id = self.queryier.ask_user_with_default_and_hint(
+                question="What is the service account ID?",
+                hint="You can typically find the ID by checking the login in the AWS console",
+                default_query=lambda: None,
             )
             accounts["Service"] = service_account_id
 
@@ -311,8 +313,10 @@ class CLIHandler:
         # Get environment folders for later use
         environment_folders = self.deployment_migration.find_all_environment_folders()
         self.terminal.hr_line()
-        service_account_id = Prompt.ask(
-            "What is the account ID of your service account?"
+        service_account_id = self.queryier.ask_user_with_default_and_hint(
+            question="What is the service account ID?",
+            hint="You can typically find the ID by checking the login in the AWS console",
+            default_query=lambda: None,
         )
 
         # Upgrade terraform resources
@@ -424,7 +428,7 @@ def main():
         # Create instances of the required dependencies
         file_handler = LocalFileHandler()
         github_actions_author = YAMLGithubActionsAuthor()
-        parameter_store = AWSAWS()
+        aws_client = AWSClient()
         terraform_modifier = RegexTerraformModifier()
         version_control = GitVersionControl()
         application_context = ApplicationContextFinder()
@@ -436,7 +440,7 @@ def main():
             file_handler=file_handler,
             github_actions_author=github_actions_author,
             terraform=terraform_modifier,
-            aws=parameter_store,
+            aws=aws_client,
             application_context=application_context,
             github_api=github_api,
         )

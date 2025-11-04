@@ -5,7 +5,7 @@ from deployment_migration.infrastructure.version_control import GitVersionContro
 from deployment_migration.infrastructure.terraform_modifier import (
     RegexTerraformModifier,
 )
-from deployment_migration.infrastructure.parameter_store import AWSAWS
+from deployment_migration.infrastructure.aws import AWSClient
 from deployment_migration.infrastructure.github_actions_author import (
     YAMLGithubActionsAuthor,
 )
@@ -14,6 +14,6 @@ __all__ = [
     "LocalFileHandler",
     "GitVersionControl",
     "RegexTerraformModifier",
-    "AWSAWS",
+    "AWSClient",
     "YAMLGithubActionsAuthor",
 ]
