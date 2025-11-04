@@ -195,7 +195,6 @@ class CLIHandler:
             ),
         )
 
-        # Hardcoded to GRADLE and ECS - these are the only supported options
         build_tool = ApplicationBuildTool.GRADLE
         runtime_target = ApplicationRuntimeTarget.ECS
 
@@ -306,7 +305,6 @@ class CLIHandler:
             ),
         )
 
-        # Hardcoded to GRADLE and ECS - these are the only supported options
         build_tool = ApplicationBuildTool.GRADLE
         runtime_target = ApplicationRuntimeTarget.ECS
 

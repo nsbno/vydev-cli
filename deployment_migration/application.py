@@ -252,6 +252,25 @@ class Terraform(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    def update_spring_boot_service_module(
+        self: Self,
+        terraform_config: str,
+        ecr_data_source_name: str,
+    ) -> str:
+        """Update Spring Boot service module for RC3 compatibility.
+
+        Removes docker_image and datadog_tags variables, and adds repository_url.
+
+        Args:
+            terraform_config: The Terraform configuration string
+            ecr_data_source_name: Name of the ECR data source (e.g., 'ecr_repository')
+
+        Returns:
+            Updated Terraform configuration string
+        """
+        pass
+
 
 class AWS(abc.ABC):
     @abc.abstractmethod
@@ -838,7 +857,7 @@ class DeploymentMigration:
             "github.com/nsbno/terraform-aws-ecs-service": "3.0.0-rc13",
             # TODO: This is not released yet
             "github.com/nsbno/terraform-aws-lambda": "2.0.0-beta1",
-            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "3.0.0-rc1",
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service": "3.0.0-rc3",
             "github.com/nsbno/terraform-aws-account-metadata": "0.5.0",
         }
 
@@ -906,6 +925,28 @@ class DeploymentMigration:
                 ecs_config
             )
             self.file_handler.overwrite_file(ecs_file_path, ecs_config)
+
+        # Handle Spring Boot module-specific updates for RC3
+        spring_boot_module_source = (
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"
+        )
+        if self.terraform.has_module(
+            spring_boot_module_source,
+            Path(terraform_infrastructure_folder),
+        ):
+            spring_boot_module = self.terraform.find_module(
+                spring_boot_module_source,
+                Path(terraform_infrastructure_folder),
+            )
+            spring_boot_file_path = spring_boot_module["file_path"]
+
+            # Update Spring Boot module: remove docker_image and datadog_tags, add repository_url
+            spring_boot_config = self.file_handler.read_file(spring_boot_file_path)
+            spring_boot_config = self.terraform.update_spring_boot_service_module(
+                spring_boot_config,
+                ecr_data_source_name="this",
+            )
+            self.file_handler.overwrite_file(spring_boot_file_path, spring_boot_config)
 
     def is_repo_in_clean_state(self) -> bool:
         """Checks if the Git repository is in a clean state

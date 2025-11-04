@@ -623,3 +623,54 @@ class RegexTerraformModifier(Terraform):
             )
 
         return values
+
+    def update_spring_boot_service_module(
+        self, terraform_config: str, ecr_data_source_name: str
+    ) -> str:
+        """Update Spring Boot service module for RC3 compatibility.
+
+        Removes docker_image and datadog_tags variables, and adds repository_url.
+
+        Args:
+            terraform_config: The Terraform configuration string
+            ecr_data_source_name: Name of the ECR data source (e.g., 'ecr_repository')
+
+        Returns:
+            Updated Terraform configuration string
+        """
+        # Find the Spring Boot module
+        module_pattern = r'module\s+"([^"]+)"\s+\{[^}]*?source\s*=\s*"[^"]*spring-boot-service"[^}]*\}'
+        match = re.search(module_pattern, terraform_config, re.DOTALL)
+
+        if not match:
+            # No Spring Boot module found, return config unchanged
+            return terraform_config
+
+        module_block = match.group(0)
+        updated_module = module_block
+
+        # Remove docker_image line
+        docker_image_pattern = r"\s*docker_image\s*=\s*[^\n]+\n"
+        updated_module = re.sub(docker_image_pattern, "", updated_module)
+
+        # Remove datadog_tags block (handles multi-line block)
+        datadog_tags_pattern = r"\s*datadog_tags\s*=\s*\{[^}]*\}\n"
+        updated_module = re.sub(
+            datadog_tags_pattern, "", updated_module, flags=re.DOTALL
+        )
+
+        # Add repository_url if not already present
+        if "repository_url" not in updated_module:
+            # Find the closing brace of the module and add repository_url before it
+            closing_brace_pattern = r"(\s*)\}"
+            repository_url_line = (
+                f"\n  repository_url = data.{ecr_data_source_name}.repository_url\n"
+            )
+            updated_module = re.sub(
+                closing_brace_pattern, repository_url_line + r"\1}", updated_module
+            )
+
+        # Replace the old module block with the updated one
+        terraform_config = terraform_config.replace(module_block, updated_module)
+
+        return terraform_config

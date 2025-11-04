@@ -226,6 +226,7 @@ def test_updates_and_writes_terraform_application_resources(
     terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
         found_module.get(module)
     )
+    terraform_modifier.has_module.return_value = False  # No ECS or Spring Boot module
 
     expected_file = "Never gonna give you up, never gonna let you down"
     terraform_modifier.add_module.side_effect = (
@@ -267,6 +268,7 @@ def test_update_terraform_application_resources_updates_module_versions(
     terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
         found_module.get(module)
     )
+    terraform_modifier.has_module.return_value = False  # No ECS or Spring Boot module
 
     application.upgrade_terraform_application_resources(
         terraform_infrastructure_folder="infrastructure",
@@ -692,7 +694,10 @@ def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
         "file_path": Path("terraform/template/service.tf"),
         "source": "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0",
     }
-    terraform_modifier.has_module.return_value = True
+    # has_module returns True only for ECS module, not Spring Boot
+    terraform_modifier.has_module.side_effect = (
+        lambda module, *_: module == "github.com/nsbno/terraform-aws-ecs-service"
+    )
 
     service_tf_content = (
         'module "ecs_service" {\n'
@@ -776,7 +781,10 @@ def test_upgrade_terraform_application_adds_force_new_deployment(
 ) -> None:
     """Test that upgrade_terraform_application_resources adds force_new_deployment to ECS module."""
     # Setup: ECS module exists
-    terraform_modifier.has_module.return_value = True
+    # has_module returns True only for ECS module, not Spring Boot
+    terraform_modifier.has_module.side_effect = (
+        lambda module, *_: module == "github.com/nsbno/terraform-aws-ecs-service"
+    )
     terraform_modifier.find_module.side_effect = lambda source, folder: {
         "github.com/nsbno/terraform-aws-ecs-service": {
             "name": "ecs_service",
@@ -879,7 +887,10 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     terraform_modifier.find_module.side_effect = lambda module, *_: (
         module_locations.get(module)
     )
-    terraform_modifier.has_module.return_value = True
+    # has_module returns True only for ECS module, not Spring Boot
+    terraform_modifier.has_module.side_effect = (
+        lambda module, *_: module == "github.com/nsbno/terraform-aws-ecs-service"
+    )
 
     # Mock file contents for each file (mutable dict that gets updated)
     file_contents = {
@@ -1394,3 +1405,210 @@ def test_ensure_cache_in_gitignore_handles_missing_trailing_newline(
     file_handler.overwrite_file.assert_called_once_with(
         Path(".gitignore"), expected_content
     )
+
+
+class TestSpringBootModuleRC3Upgrade:
+    """Tests for Spring Boot module upgrade to version 3.0.0-rc3."""
+
+    def test_spring_boot_module_version_updated_to_rc3(
+        self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler: FileHandler,
+    ):
+        """Test that Spring Boot module version is updated from rc1 to rc3."""
+        spring_boot_module = (
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"
+        )
+        found_module = {
+            "github.com/nsbno/terraform-aws-ecs-service": None,
+            "github.com/nsbno/terraform-aws-lambda": None,
+            spring_boot_module: {
+                "name": "spring_boot_service",
+                "file_path": Path("terraform/main.tf"),
+            },
+            "github.com/nsbno/terraform-aws-account-metadata": None,
+        }
+
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module.get(module)
+        )
+        terraform_modifier.has_module.return_value = False  # No ECS module
+
+        terraform_config = (
+            'module "spring_boot_service" {\n'
+            '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
+            '  version = "3.0.0-rc1"\n'
+            "}\n"
+        )
+        file_handler.read_file.return_value = terraform_config
+
+        # Mock update_module_versions to return updated config
+        terraform_modifier.update_module_versions.return_value = (
+            terraform_config.replace("3.0.0-rc1", "3.0.0-rc3")
+        )
+
+        application.upgrade_terraform_application_resources(
+            terraform_infrastructure_folder="terraform"
+        )
+
+        # Verify update_module_versions was called with rc3
+        update_calls = [
+            call
+            for call in terraform_modifier.mock_calls
+            if call[0] == "update_module_versions"
+        ]
+
+        # Find the call that updated Spring Boot module
+        spring_boot_updated = False
+        for call in update_calls:
+            if (
+                "target_modules" in call.kwargs
+                and spring_boot_module in call.kwargs["target_modules"]
+            ):
+                assert call.kwargs["target_modules"][spring_boot_module] == "3.0.0-rc3"
+                spring_boot_updated = True
+
+        assert (
+            spring_boot_updated
+        ), "Spring Boot module should be updated to version 3.0.0-rc3"
+
+    def test_spring_boot_module_docker_image_variable_removed(
+        self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler: FileHandler,
+    ):
+        """Test that docker_image variable is removed from Spring Boot modules."""
+        spring_boot_module = (
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"
+        )
+        found_module = {
+            "github.com/nsbno/terraform-aws-ecs-service": None,
+            "github.com/nsbno/terraform-aws-lambda": None,
+            spring_boot_module: {
+                "name": "spring_boot_service",
+                "file_path": Path("terraform/main.tf"),
+            },
+            "github.com/nsbno/terraform-aws-account-metadata": None,
+        }
+
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module.get(module)
+        )
+        # has_module returns True only for Spring Boot module
+        terraform_modifier.has_module.side_effect = (
+            lambda module, *_: module == spring_boot_module
+        )
+
+        terraform_config = (
+            'module "spring_boot_service" {\n'
+            '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
+            '  version = "3.0.0-rc3"\n'
+            "\n"
+            "  docker_image = local.docker_image\n"
+            '  service_name = "my-service"\n'
+            "}\n"
+        )
+        file_handler.read_file.return_value = terraform_config
+
+        application.upgrade_terraform_application_resources(
+            terraform_infrastructure_folder="terraform"
+        )
+
+        # Verify update_spring_boot_service_module was called
+        terraform_modifier.update_spring_boot_service_module.assert_called_once()
+
+    def test_spring_boot_module_datadog_tags_block_removed(
+        self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler: FileHandler,
+    ):
+        """Test that datadog_tags block is removed from Spring Boot modules."""
+        spring_boot_module = (
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"
+        )
+        found_module = {
+            "github.com/nsbno/terraform-aws-ecs-service": None,
+            "github.com/nsbno/terraform-aws-lambda": None,
+            spring_boot_module: {
+                "name": "spring_boot_service",
+                "file_path": Path("terraform/main.tf"),
+            },
+            "github.com/nsbno/terraform-aws-account-metadata": None,
+        }
+
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module.get(module)
+        )
+        # has_module returns True only for Spring Boot module
+        terraform_modifier.has_module.side_effect = (
+            lambda module, *_: module == spring_boot_module
+        )
+
+        terraform_config = (
+            'module "spring_boot_service" {\n'
+            '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
+            '  version = "3.0.0-rc3"\n'
+            "\n"
+            "  datadog_tags = {\n"
+            "    environment = var.environment\n"
+            "    version     = local.image_tag\n"
+            "  }\n"
+            '  service_name = "my-service"\n'
+            "}\n"
+        )
+        file_handler.read_file.return_value = terraform_config
+
+        application.upgrade_terraform_application_resources(
+            terraform_infrastructure_folder="terraform"
+        )
+
+        # Verify update_spring_boot_service_module was called
+        terraform_modifier.update_spring_boot_service_module.assert_called_once()
+
+    def test_spring_boot_module_repository_url_added(
+        self,
+        application: DeploymentMigration,
+        terraform_modifier: Terraform,
+        file_handler: FileHandler,
+    ):
+        """Test that repository_url variable is added to Spring Boot modules."""
+        spring_boot_module = (
+            "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"
+        )
+        found_module = {
+            "github.com/nsbno/terraform-aws-ecs-service": None,
+            "github.com/nsbno/terraform-aws-lambda": None,
+            spring_boot_module: {
+                "name": "spring_boot_service",
+                "file_path": Path("terraform/main.tf"),
+            },
+            "github.com/nsbno/terraform-aws-account-metadata": None,
+        }
+
+        terraform_modifier.find_module.side_effect = lambda module, *_, **__: (
+            found_module.get(module)
+        )
+        # has_module returns True only for Spring Boot module
+        terraform_modifier.has_module.side_effect = (
+            lambda module, *_: module == spring_boot_module
+        )
+
+        terraform_config = (
+            'module "spring_boot_service" {\n'
+            '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
+            '  version = "3.0.0-rc3"\n'
+            "\n"
+            '  service_name = "my-service"\n'
+            "}\n"
+        )
+        file_handler.read_file.return_value = terraform_config
+
+        application.upgrade_terraform_application_resources(
+            terraform_infrastructure_folder="terraform"
+        )
+
+        # Verify update_spring_boot_service_module was called
+        terraform_modifier.update_spring_boot_service_module.assert_called_once()
