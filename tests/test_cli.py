@@ -127,7 +127,7 @@ def test_upgrade_application_repo_success(
 
     def mock_prompt(*args, **kwargs):
         # Check for default parameter which rich.prompt uses
-        if "default" in kwargs:
+        if "default" in kwargs and kwargs["default"] is not None:
             return kwargs["default"]
         prompt = str(args[0]).lower() if args else ""
         if "service account" in prompt or "account id" in prompt:

@@ -638,39 +638,94 @@ class RegexTerraformModifier(Terraform):
         Returns:
             Updated Terraform configuration string
         """
-        # Find the Spring Boot module
-        module_pattern = r'module\s+"([^"]+)"\s+\{[^}]*?source\s*=\s*"[^"]*spring-boot-service"[^}]*\}'
-        match = re.search(module_pattern, terraform_config, re.DOTALL)
+        # Find all module declarations using bracket counting
+        module_start_pattern = r'module\s+"([^"]+)"\s+\{'
 
-        if not match:
-            # No Spring Boot module found, return config unchanged
+        for module_match in re.finditer(module_start_pattern, terraform_config):
+            start_pos = module_match.end() - 1  # Position of opening '{'
+
+            # Use bracket counting to find the matching closing brace
+            bracket_count = 0
+            end_pos = -1
+
+            for i in range(start_pos, len(terraform_config)):
+                if terraform_config[i] == "{":
+                    bracket_count += 1
+                elif terraform_config[i] == "}":
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        end_pos = i
+                        break
+
+            if end_pos == -1:
+                continue  # Couldn't find matching bracket
+
+            # Extract the full module block
+            module_block = terraform_config[module_match.start() : end_pos + 1]
+
+            # Check if this is a Spring Boot service module
+            if "spring-boot-service" not in module_block:
+                continue
+
+            # Found the Spring Boot module, now update it
+            updated_module = module_block
+
+            # Remove docker_image line (including leading whitespace)
+            docker_image_pattern = r"^[ \t]*docker_image\s*=\s*[^\n]+\n"
+            updated_module = re.sub(
+                docker_image_pattern, "", updated_module, flags=re.MULTILINE
+            )
+
+            # Remove datadog_tags block (handles multi-line block with nested braces)
+            # Use bracket counting for datadog_tags
+            datadog_match = re.search(r"datadog_tags\s*=\s*\{", updated_module)
+            if datadog_match:
+                datadog_start = datadog_match.start()
+                brace_start = datadog_match.end() - 1
+                bracket_count = 0
+                datadog_end = -1
+
+                for i in range(brace_start, len(updated_module)):
+                    if updated_module[i] == "{":
+                        bracket_count += 1
+                    elif updated_module[i] == "}":
+                        bracket_count -= 1
+                        if bracket_count == 0:
+                            datadog_end = i + 1
+                            break
+
+                if datadog_end > 0:
+                    # Find the newline after the closing brace if it exists
+                    if (
+                        datadog_end < len(updated_module)
+                        and updated_module[datadog_end] == "\n"
+                    ):
+                        datadog_end += 1
+                    # Remove the entire datadog_tags block including leading whitespace
+                    line_start = datadog_start
+                    while line_start > 0 and updated_module[line_start - 1] in " \t":
+                        line_start -= 1
+                    updated_module = (
+                        updated_module[:line_start] + updated_module[datadog_end:]
+                    )
+
+            # Add repository_url if not already present
+            if "repository_url" not in updated_module:
+                # Find the last closing brace of the module and add repository_url before it
+                last_brace = updated_module.rfind("}")
+                if last_brace > 0:
+                    repository_url_line = f"  repository_url = data.aws_ecr_repository.{ecr_data_source_name}.repository_url\n"
+                    updated_module = (
+                        updated_module[:last_brace]
+                        + repository_url_line
+                        + updated_module[last_brace:]
+                    )
+
+            # Replace the old module block with the updated one
+            terraform_config = terraform_config.replace(module_block, updated_module)
+
+            # We only process the first Spring Boot module found
             return terraform_config
 
-        module_block = match.group(0)
-        updated_module = module_block
-
-        # Remove docker_image line
-        docker_image_pattern = r"\s*docker_image\s*=\s*[^\n]+\n"
-        updated_module = re.sub(docker_image_pattern, "", updated_module)
-
-        # Remove datadog_tags block (handles multi-line block)
-        datadog_tags_pattern = r"\s*datadog_tags\s*=\s*\{[^}]*\}\n"
-        updated_module = re.sub(
-            datadog_tags_pattern, "", updated_module, flags=re.DOTALL
-        )
-
-        # Add repository_url if not already present
-        if "repository_url" not in updated_module:
-            # Find the closing brace of the module and add repository_url before it
-            closing_brace_pattern = r"(\s*)\}"
-            repository_url_line = (
-                f"\n  repository_url = data.{ecr_data_source_name}.repository_url\n"
-            )
-            updated_module = re.sub(
-                closing_brace_pattern, repository_url_line + r"\1}", updated_module
-            )
-
-        # Replace the old module block with the updated one
-        terraform_config = terraform_config.replace(module_block, updated_module)
-
+        # No Spring Boot module found, return config unchanged
         return terraform_config
