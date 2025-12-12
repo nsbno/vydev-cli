@@ -28,7 +28,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     ) -> dict[str, Any]:
         if build_tool == ApplicationBuildTool.GRADLE:
             build_with_params = {
-                "uses": self._workflow("build", "gradle", "v1"),
+                "uses": self._workflow("build", "gradle", "v2"),
                 "secrets": "inherit",
             }
 
@@ -39,7 +39,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         elif build_tool == ApplicationBuildTool.PYTHON:
             build_step = {
                 "build": {
-                    "uses": self._workflow("build", build_tool, "v1"),
+                    "uses": self._workflow("build", build_tool, "v2"),
                 }
             }
         else:
@@ -48,7 +48,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         test_step = {}
         if add_tests:
             test_with_params = {
-                "uses": self._workflow("test", "gradle", "v1"),
+                "uses": self._workflow("test", "gradle", "v2"),
                 "secrets": "inherit",
             }
 
@@ -76,7 +76,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
             package_step = {
                 "package": {
-                    "uses": self._workflow("package", "docker", "v1"),
+                    "uses": self._workflow("package", "docker", "v2"),
                     "needs": ["build", *(["test"] if add_tests else [])],
                     "secrets": "inherit",
                     "with": with_params,
@@ -86,7 +86,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             package_step = {
                 "package": {
                     "needs": ["build", *(["test"] if add_tests else [])],
-                    "uses": self._workflow("package", "s3", "v1"),
+                    "uses": self._workflow("package", "s3", "v2"),
                     "secrets": "inherit",
                     "with": {
                         "ecr-repo-name": repository_name,
@@ -143,7 +143,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     ) -> dict[str, Any]:
         return {
             "upload-openapi-spec": {
-                "uses": self._workflow("helpers", "upload-openapi-spec", "v1"),
+                "uses": self._workflow("helpers", "upload-openapi-spec", "v2"),
                 "needs": ["build"],
                 "secrets": "inherit",
                 "with": {
@@ -178,12 +178,9 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         :return: The GitHub Actions workflow as a YAML string
         """
         terraform_changes_job = {
-            "uses": self._workflow("helpers.find-changes", "terraform", "v1"),
+            "uses": self._workflow("helpers.find-changes", "terraform", "v2"),
             "secrets": "inherit",
         }
-
-        if skip_service_environment:
-            terraform_changes_job["with"] = {"skip-service-environment": True}
 
         jobs = {
             "terraform-changes": terraform_changes_job,
@@ -206,19 +203,15 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
 
         # Add the deploy job with dynamic needs
         deploy_with = {
-            "applications": application_name,
             "terraform-changes": "${{ needs.terraform-changes.outputs.has-changes }}",
         }
-
-        if skip_service_environment:
-            deploy_with["skip-service-environment"] = True
 
         if aws_role_name:
             deploy_with["aws-role-name-to-assume"] = aws_role_name
 
         jobs["deploy"] = {
             "needs": [name for name in jobs.keys()],
-            "uses": self._workflow("deployment", "all-environments", "v1"),
+            "uses": self._workflow("deployment", "all-environments-ecs", "v2"),
             "secrets": "inherit",
             "if": "!cancelled() && !contains(needs.*.results, 'failure') && success()",
             "with": deploy_with,
@@ -250,9 +243,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         Create a GitHub Actions pull request comment workflow for branch deployments.
         """
         # Deploy to test environment on .deploy comment
-        deploy_to_test_with = {
-            "applications": application_name,
-        }
+        deploy_to_test_with = {}
 
         if aws_role_name:
             deploy_to_test_with["aws-role-name-to-assume"] = aws_role_name
@@ -260,17 +251,14 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         # Terraform plan on .tf comment
         tf_plan_with = {}
 
-        if skip_service_environment:
-            tf_plan_with["skip-service-environment"] = True
-
         jobs = {
             "deploy-to-test": {
-                "uses": self._workflow("deployment", "branch-deploy.on-comment", "v1"),
+                "uses": self._workflow("deployment", "branch-deploy.on-comment", "v2"),
                 "secrets": "inherit",
                 "with": deploy_to_test_with,
             },
             "tf-plan-comment": {
-                "uses": self._workflow("helpers", "terraform-plan.on-comment", "v1"),
+                "uses": self._workflow("helpers", "terraform-plan.on-comment", "v2"),
                 "secrets": "inherit",
             },
         }

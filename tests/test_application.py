@@ -1001,45 +1001,6 @@ class TestServiceEnvironmentDetection:
         assert result is True
 
 
-class TestWorkflowGenerationWithServiceFlag:
-    """Tests for skip-service-environment flag in workflow generation"""
-
-    def test_deployment_workflow_includes_skip_flag_when_no_service_folder(
-        self,
-        application: DeploymentMigration,
-        github_actions_author: GithubActionsAuthor,
-        file_handler: FileHandler,
-    ) -> None:
-        """Generated workflow should include skip-service-environment flag"""
-        # No service folder exists
-        file_handler.folder_exists.return_value = False
-        # Mock openapi spec detection to raise FileNotFoundError (no .circleci folder)
-        file_handler.read_file.side_effect = FileNotFoundError()
-
-        github_actions_author.create_deployment_workflow.return_value = (
-            "name: Deploy\n"
-            "jobs:\n"
-            "  terraform-changes:\n"
-            "    with:\n"
-            "      skip-service-environment: true\n"
-        )
-        github_actions_author.create_pull_request_workflow.return_value = (
-            "name: PR\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
-        )
-
-        application.create_github_action_deployment_workflow(
-            repository_name="my-repo",
-            application_name="my-app",
-            application_build_tool=ApplicationBuildTool.PYTHON,
-            application_runtime_target=ApplicationRuntimeTarget.ECS,
-            terraform_base_folder=Path("terraform"),
-        )
-
-        # Verify the workflow generator was called with skip flag
-        github_actions_author.create_deployment_workflow.assert_called_once()
-        call_kwargs = github_actions_author.create_deployment_workflow.call_args.kwargs
-        assert call_kwargs.get("skip_service_environment") is True
-
     def test_deployment_workflow_omits_skip_flag_when_service_folder_exists(
         self,
         application: DeploymentMigration,

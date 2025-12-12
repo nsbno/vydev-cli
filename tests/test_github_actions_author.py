@@ -80,8 +80,6 @@ def test_create_deployment_workflow_includes_application_name(
     # And in deploy job
     assert "deploy" in workflow_dict["jobs"]
     assert "with" in workflow_dict["jobs"]["deploy"]
-    assert "applications" in workflow_dict["jobs"]["deploy"]["with"]
-    assert workflow_dict["jobs"]["deploy"]["with"]["applications"] == application_name
 
 
 def test_create_deployment_workflow_includes_all_required_jobs(
