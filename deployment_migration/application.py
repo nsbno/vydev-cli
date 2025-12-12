@@ -1165,3 +1165,22 @@ class DeploymentMigration:
 
         new_content = existing_content + f"{cache_entry}\n"
         self.file_handler.overwrite_file(gitignore_path, new_content)
+
+
+    def get_github_repository_name(self) -> str:
+        """Get the GitHub repository name from the git origin URL"""
+        try:
+            import subprocess
+
+            # Run git status --porcelain to check for uncommitted changes
+            # If the output is empty, the repository is in a clean state
+            result = subprocess.run(
+                ["basename", "-s", ".git", "`git", "config", "--get", "remote.origin.url`"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            # Handle git command errors
+            raise RuntimeError(f"Git operation failed: {e}")

@@ -313,11 +313,7 @@ class CLIHandler:
         # Get environment folders for later use
         environment_folders = self.deployment_migration.find_all_environment_folders()
         self.terminal.hr_line()
-        service_account_id = self.queryier.ask_user_with_default_and_hint(
-            question="What is the service account ID?",
-            hint="You can typically find the ID by checking the login in the AWS console",
-            default_query=lambda: None,
-        )
+        github_repository_name = self.deployment_migration.get_github_repository_name()
 
         # Upgrade terraform resources
         self.console.print(
@@ -332,7 +328,7 @@ class CLIHandler:
         self.deployment_migration.replace_image_with_ecr_repository_url(
             str(terraform_folder),
             repository_name,
-            service_account_id,
+            github_repository_name,
         )
         self.console.print(
             "[green]Application terraform resources upgraded successfully![/green]"

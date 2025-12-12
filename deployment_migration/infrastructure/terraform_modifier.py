@@ -60,12 +60,12 @@ class RegexTerraformModifier(Terraform):
     def replace_image_tag_on_ecs_module(
         self: Self,
         terraform_config: str,
-        ecr_repository_data_source_name: str,
+        vy_ecs_image_data_source_name: str,
     ) -> str:
         """
-        Replace image tag in ECS module configuration with reference to ECR repository.
+        Replace image tag in ECS module configuration with reference to Vy ECS Image Data source.
 
-        :param ecr_repository_data_source_name: Name of the ECR repository data source
+        :param vy_ecs_image_data_source_name: Name of the Vy ECS Image Data source
         :return: The modified Terraform configuration with updated image tag
         """
         # Pattern that handles nested blocks by using .*? with DOTALL and lookahead
@@ -81,7 +81,7 @@ class RegexTerraformModifier(Terraform):
                 return match.group(0)  # Return unchanged if not ECS module
 
             # Replace image line with reference to ECR repository
-            new_variable = f"\n    repository_url = data.aws_ecr_repository.{ecr_repository_data_source_name}.repository_url"
+            new_variable = f"\n    image = data.vy_ecs_image.{vy_ecs_image_data_source_name}"
             # Find and replace the image line
             image_pattern = r"\s+image\s*=\s*\"[^\"]*\""
             modified_content = re.sub(image_pattern, new_variable, module_content)
