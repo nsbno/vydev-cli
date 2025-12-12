@@ -242,12 +242,6 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         """
         Create a GitHub Actions pull request comment workflow for branch deployments.
         """
-        # Deploy to test environment on .deploy comment
-        deploy_to_test_with = {}
-
-        if aws_role_name:
-            deploy_to_test_with["aws-role-name-to-assume"] = aws_role_name
-
         # Terraform plan on .tf comment
         tf_plan_with = {}
 
@@ -255,7 +249,6 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "deploy-to-test": {
                 "uses": self._workflow("deployment", "branch-deploy.on-comment", "v2"),
                 "secrets": "inherit",
-                "with": deploy_to_test_with,
             },
             "tf-plan-comment": {
                 "uses": self._workflow("helpers", "terraform-plan.on-comment", "v2"),
