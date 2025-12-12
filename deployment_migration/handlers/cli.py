@@ -322,6 +322,9 @@ class CLIHandler:
         self.deployment_migration.upgrade_application_repo_terraform_provider_versions(
             [str(v) for v in ([terraform_folder] + environment_folders)]
         )
+        self.deployment_migration.upgrade_application_repo_vy_provider_versions(
+            [str(v) for v in ([terraform_folder] + environment_folders)]
+        )
         self.deployment_migration.upgrade_terraform_application_resources(
             str(terraform_folder)
         )

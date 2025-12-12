@@ -483,7 +483,7 @@ def test_replace_image_tag_on_ecs_module(terraform_modifier: Terraform) -> None:
         'module "github.com/nsbno/terraform-aws-ecs-service" {\n'
         '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=2.0.0-beta1"\n'
         '  existing_var = "existing_value"\n'
-        "    repository_url = data.aws_ecr_repository.this.repository_url\n"
+        "    image = data.vy_ecs_image.this\n"
         '  another_existing_var = "existing_value"\n'
         "}"
     )

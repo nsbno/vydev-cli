@@ -808,6 +808,28 @@ class DeploymentMigration:
             )
             self.file_handler.overwrite_file(provider_data["file"], config)
 
+    def upgrade_application_repo_vy_provider_versions(
+            self: Self,
+            folders: list[str],
+    ):
+        """Updates the Vy provider versions in the repo
+
+        :param folders: All folders with Terraform Config
+        """
+        for folder in folders:
+            provider_data = self.terraform.find_provider("vy", Path(folder))
+            if not provider_data:
+                continue
+
+            config = self.file_handler.read_file(provider_data["file"])
+            config = self.terraform.update_provider_versions(
+                config,
+                target_providers={
+                    "nsbno/vy": ">= 1.1.0, < 2.0.0",
+                },
+            )
+            self.file_handler.overwrite_file(provider_data["file"], config)
+
     def replace_image_with_ecr_repository_url(
         self: Self,
         terraform_infrastructure_folder: str,
