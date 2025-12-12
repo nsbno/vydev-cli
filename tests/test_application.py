@@ -706,13 +706,13 @@ def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
     )
     file_handler.read_file.return_value = service_tf_content
     terraform_modifier.update_module_versions.return_value = service_tf_content.replace(
-        "2.0.0", "3.0.0-rc3"
+        "2.0.0", "3.0.0"
     )
     terraform_modifier.add_test_listener_to_ecs_module.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+        service_tf_content.replace("2.0.0", "3.0.0")
     )
     terraform_modifier.add_force_new_deployment_to_ecs_module.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0-rc3")
+        service_tf_content.replace("2.0.0", "3.0.0")
     )
 
     written_files = {}
@@ -724,7 +724,7 @@ def test_upgrade_terraform_application_resources_with_ecs_in_separate_file(
 
     # Should write to service.tf, NOT main.tf
     assert "terraform/template/service.tf" in written_files
-    assert "3.0.0-rc3" in written_files["terraform/template/service.tf"]
+    assert "3.0.0" in written_files["terraform/template/service.tf"]
 
 
 def test_replace_image_with_ecr_when_ecs_in_separate_file(
@@ -805,13 +805,13 @@ def test_upgrade_terraform_application_adds_force_new_deployment(
     )
     file_handler.read_file.return_value = service_tf_content
     terraform_modifier.update_module_versions.return_value = service_tf_content.replace(
-        "2.0.0", "3.0.0-rc9"
+        "2.0.0", "3.0.0"
     )
     terraform_modifier.add_test_listener_to_ecs_module.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0-rc9")
+        service_tf_content.replace("2.0.0", "3.0.0")
     )
     terraform_modifier.add_force_new_deployment_to_ecs_module.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0-rc9")
+        service_tf_content.replace("2.0.0", "3.0.0")
         + "  force_new_deployment = true\n"
     )
 
@@ -952,7 +952,7 @@ def test_upgrade_terraform_resources_with_modules_in_multiple_files(
     assert Path("terraform/template/main.tf") in written_files
 
     # Each file should have the correct version
-    assert "3.0.0-rc13" in written_files[Path("terraform/template/ecs.tf")]
+    assert "3.0.0" in written_files[Path("terraform/template/ecs.tf")]
     assert "2.0.0-beta1" in written_files[Path("terraform/template/lambda.tf")]
     assert "0.5.0" in written_files[Path("terraform/template/main.tf")]
 
@@ -1369,7 +1369,7 @@ def test_ensure_cache_in_gitignore_handles_missing_trailing_newline(
 
 
 class TestSpringBootModuleRC3Upgrade:
-    """Tests for Spring Boot module upgrade to version 3.0.0-rc3."""
+    """Tests for Spring Boot module upgrade to version 3.0.0."""
 
     def test_spring_boot_module_version_updated_to_rc3(
         self,
@@ -1399,14 +1399,14 @@ class TestSpringBootModuleRC3Upgrade:
         terraform_config = (
             'module "spring_boot_service" {\n'
             '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
-            '  version = "3.0.0-rc1"\n'
+            '  version = "3.0.0"\n'
             "}\n"
         )
         file_handler.read_file.return_value = terraform_config
 
         # Mock update_module_versions to return updated config
         terraform_modifier.update_module_versions.return_value = (
-            terraform_config.replace("3.0.0-rc1", "3.0.0-rc3")
+            terraform_config.replace("3.0.0", "3.0.0")
         )
 
         application.upgrade_terraform_application_resources(
@@ -1427,12 +1427,12 @@ class TestSpringBootModuleRC3Upgrade:
                 "target_modules" in call.kwargs
                 and spring_boot_module in call.kwargs["target_modules"]
             ):
-                assert call.kwargs["target_modules"][spring_boot_module] == "3.0.0-rc3"
+                assert call.kwargs["target_modules"][spring_boot_module] == "3.0.0"
                 spring_boot_updated = True
 
         assert (
             spring_boot_updated
-        ), "Spring Boot module should be updated to version 3.0.0-rc3"
+        ), "Spring Boot module should be updated to version 3.0.0"
 
     def test_spring_boot_module_docker_image_variable_removed(
         self,
@@ -1465,7 +1465,7 @@ class TestSpringBootModuleRC3Upgrade:
         terraform_config = (
             'module "spring_boot_service" {\n'
             '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
-            '  version = "3.0.0-rc3"\n'
+            '  version = "3.0.0"\n'
             "\n"
             "  docker_image = local.docker_image\n"
             '  service_name = "my-service"\n'
@@ -1511,7 +1511,7 @@ class TestSpringBootModuleRC3Upgrade:
         terraform_config = (
             'module "spring_boot_service" {\n'
             '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
-            '  version = "3.0.0-rc3"\n'
+            '  version = "3.0.0"\n'
             "\n"
             "  datadog_tags = {\n"
             "    environment = var.environment\n"
@@ -1560,7 +1560,7 @@ class TestSpringBootModuleRC3Upgrade:
         terraform_config = (
             'module "spring_boot_service" {\n'
             '  source  = "github.com/nsbno/terraform-digitalekanaler-modules//spring-boot-service"\n'
-            '  version = "3.0.0-rc3"\n'
+            '  version = "3.0.0"\n'
             "\n"
             '  service_name = "my-service"\n'
             "}\n"

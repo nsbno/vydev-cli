@@ -685,7 +685,7 @@ def test_add_force_new_deployment_to_ecs_module(
     # Arrange
     terraform_config = """
     module "ecs_service" {
-      source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"
+      source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"
       existing_var = "existing_value"
 
       lb_listeners = [{
@@ -701,7 +701,7 @@ def test_add_force_new_deployment_to_ecs_module(
     # Assert
     assert 'module "ecs_service"' in result
     assert (
-        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"' in result
+        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"' in result
     )
     assert 'existing_var = "existing_value"' in result
     assert "force_new_deployment = true" in result
@@ -734,7 +734,7 @@ def test_add_force_new_deployment_with_nested_blocks(
     # Arrange - module with nested blocks like datadog_options
     terraform_config = """
 module "service" {
-  source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0-rc9"
+  source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"
   service_name = "my-service"
 
   datadog_options = {
