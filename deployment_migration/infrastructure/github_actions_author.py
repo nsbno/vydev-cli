@@ -104,7 +104,6 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     def create_pull_request_workflow(
         self: Self,
         repository_name: str,
-        application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
@@ -231,7 +230,6 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
     def create_pull_request_comment_workflow(
         self: Self,
         repository_name: str,
-        application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,

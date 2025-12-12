@@ -714,7 +714,6 @@ def test_prepare_migration_uses_gradle_and_ecs_without_prompting(
     # Verify the PR workflows were generated with GRADLE and ECS
     mock_deployment_migration.generate_pr_workflows.assert_called_once_with(
         repository_name="test-app",
-        application_name="test-app",
         application_build_tool=ApplicationBuildTool.GRADLE,
         application_runtime_target=ApplicationRuntimeTarget.ECS,
         terraform_base_folder=str(terraform_folder),

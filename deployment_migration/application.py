@@ -304,7 +304,6 @@ class GithubActionsAuthor(abc.ABC):
     def create_pull_request_workflow(
         self: Self,
         repository_name: str,
-        application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
@@ -318,7 +317,6 @@ class GithubActionsAuthor(abc.ABC):
     def create_pull_request_comment_workflow(
         self: Self,
         repository_name: str,
-        application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
@@ -503,7 +501,6 @@ class DeploymentMigration:
     def generate_pr_workflows(
         self: Self,
         repository_name: str,
-        application_name: str,
         application_build_tool: ApplicationBuildTool,
         application_runtime_target: ApplicationRuntimeTarget,
         terraform_base_folder: Path,
@@ -515,7 +512,6 @@ class DeploymentMigration:
 
         Args:
             repository_name: Name of the ECR repository
-            application_name: Name of the application
             application_build_tool: Build tool (PYTHON or GRADLE)
             application_runtime_target: Runtime (LAMBDA or ECS)
             terraform_base_folder: Base folder for Terraform config
@@ -545,7 +541,6 @@ class DeploymentMigration:
         # Generate PR workflow
         pull_request_workflow = self.github_actions_author.create_pull_request_workflow(
             repository_name,
-            application_name,
             application_build_tool,
             application_runtime_target,
             terraform_base_folder,
@@ -563,7 +558,6 @@ class DeploymentMigration:
         pull_request_comment_workflow = (
             self.github_actions_author.create_pull_request_comment_workflow(
                 repository_name,
-                application_name,
                 application_build_tool,
                 application_runtime_target,
                 terraform_base_folder,
@@ -666,7 +660,6 @@ class DeploymentMigration:
         # Generate PR workflows
         self.generate_pr_workflows(
             repository_name,
-            application_name,
             application_build_tool,
             application_runtime_target,
             terraform_base_folder,

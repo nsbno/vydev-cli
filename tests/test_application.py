@@ -1259,7 +1259,6 @@ def test_generate_pr_workflows_creates_only_pr_files(
 
     application.generate_pr_workflows(
         repository_name="test-app",
-        application_name="test-app",
         application_build_tool=ApplicationBuildTool.PYTHON,
         application_runtime_target=ApplicationRuntimeTarget.ECS,
         terraform_base_folder=Path("terraform"),

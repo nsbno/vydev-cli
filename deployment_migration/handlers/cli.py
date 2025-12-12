@@ -187,14 +187,6 @@ class CLIHandler:
             ),
         )
 
-        application_name = self.queryier.ask_user_with_default_and_hint(
-            question="What is the service name?",
-            hint="Service name can be found in the Terraform file where the ECS service or Lambda function is defined.",
-            default_query=lambda: self.deployment_migration.find_application_name(
-                Path(terraform_folder)
-            ),
-        )
-
         build_tool = ApplicationBuildTool.GRADLE
         runtime_target = ApplicationRuntimeTarget.ECS
 
@@ -241,7 +233,6 @@ class CLIHandler:
         self.terminal.update("Generating PR workflows...")
         self.deployment_migration.generate_pr_workflows(
             repository_name=repository_name,
-            application_name=application_name,
             application_build_tool=build_tool,
             application_runtime_target=runtime_target,
             terraform_base_folder=terraform_folder,
