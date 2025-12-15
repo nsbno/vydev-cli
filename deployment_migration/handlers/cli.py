@@ -153,6 +153,75 @@ class CLIHandler:
             "[bold]Please review, commit, and push the changes before proceeding.[/bold]"
         )
 
+    def setup_github_environments(self) -> None:
+        """
+        Set up GitHub environments with AWS account IDs.
+
+        Creates GitHub environments for all deployment environments
+        (service, test, stage, prod) and adds AWS_ACCOUNT_ID variables to each environment.
+        """
+        self.terminal.heading_and_info(
+            heading="Setup GitHub Environments",
+            info=(
+                "This will create GitHub environments for your deployment "
+                "stages and add AWS_ACCOUNT_ID variables to each."
+            ),
+        )
+
+        self.terminal.hr_line()
+        self.terminal.update("Finding environment folders...")
+
+        environment_folders = self.deployment_migration.find_all_environment_folders()
+        new_env_url, repo_address, accounts = (
+            self.deployment_migration.help_with_github_environment_setup(
+                environment_folders
+            )
+        )
+
+        # Prompt for service account ID if not found
+        if "Service" not in accounts:
+            service_account_id = self.queryier.ask_user_with_default_and_hint(
+                question="What is the service account ID?",
+                hint="You can find the ID by checking the AWS start page: https://vygruppen.awsapps.com/start",
+                default_query=lambda: None,
+            )
+            accounts["Service"] = service_account_id
+
+        self.terminal.hr_line()
+
+        # Create environments using gh CLI or show manual instructions
+        if shutil.which("gh"):
+            self.terminal.update("Creating GitHub environments using gh CLI...")
+            self.deployment_migration.initialize_github_environments(
+                accounts, repo_address
+            )
+            self.console.print(
+                "[green]GitHub environments created successfully![/green]"
+            )
+        else:
+            self.console.print(
+                "\n[bold yellow]GitHub CLI not found. Please create environments manually:[/bold yellow]"
+            )
+            for env, account in accounts.items():
+                self.console.print(f"Visit {new_env_url} to set up:")
+                self.console.print(f"   - [italic]Name[/italic]: {env}")
+                self.console.print(
+                    f"   - [italic]Environment Variable[/italic]: AWS_ACCOUNT_ID={account}\n"
+                )
+                while not Confirm.ask(f"\nHave you created the '{env}' environment?"):
+                    self.console.print(
+                        "[bold red]Please complete the environment setup before continuing[/bold red]"
+                    )
+            self.console.print(
+                "[green]GitHub environments setup complete![/green]"
+            )
+
+        self.terminal.hr_line()
+        self.console.print("\n[bold green]✅ Environments Ready![/bold green]\n")
+        self.console.print("Your GitHub environments are now configured with:")
+        for env, account in accounts.items():
+            self.console.print(f"  • {env}: AWS_ACCOUNT_ID={account}")
+
     def prepare_migration(self) -> None:
         """
         Prepare upgrade by generating PR workflows.
@@ -388,8 +457,8 @@ def main():
     parser = argparse.ArgumentParser(description="Deployment Migration CLI")
     parser.add_argument(
         "operation",
-        choices=["aws", "application", "prepare"],
-        help="Operation to perform: 'aws', 'application', or 'prepare'",
+        choices=["aws", "application", "prepare", "environments"],
+        help="Operation to perform: 'aws', 'application', 'prepare', or 'environments'",
     )
     parser.add_argument(
         "--stub", action="store_true", help="Use stub implementations for testing"
@@ -459,6 +528,8 @@ def main():
         cli_handler.upgrade_application_repo()
     elif operation == "prepare":
         cli_handler.prepare_migration()
+    elif operation == "environments":
+        cli_handler.setup_github_environments()
     else:
         console.print(f"[bold red]Error: Invalid argument '{operation}'[/bold red]")
         parser.print_help()
