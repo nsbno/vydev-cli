@@ -539,6 +539,9 @@ def test_remove_old_deployment_setup(
     ]
     file_handler.find_files_by_pattern.return_value = mock_lock_files
 
+    # Mock file_exists to return True for .circleci/config.yml
+    file_handler.file_exists.return_value = True
+
     # Call the method
     application.remove_old_deployment_setup()
 
@@ -584,6 +587,9 @@ def test_remove_old_deployment_setup_handles_no_lock_files(
     # Mock finding no terraform lock files
     file_handler.find_files_by_pattern.return_value = []
 
+    # Mock file_exists to return True for .circleci/config.yml
+    file_handler.file_exists.return_value = True
+
     # Call the method - should not raise any errors
     application.remove_old_deployment_setup()
 
@@ -604,6 +610,32 @@ def test_remove_old_deployment_setup_handles_no_lock_files(
     file_handler.overwrite_file.assert_called_once_with(
         Path(".circleci/config.yml"), expected_circleci_config
     )
+
+
+def test_remove_old_deployment_setup_handles_missing_circleci_config(
+    application: DeploymentMigration,
+    file_handler: FileHandler,
+) -> None:
+    """Test that remove_old_deployment_setup handles case when .circleci/config.yml doesn't exist."""
+    # Mock finding no terraform lock files
+    file_handler.find_files_by_pattern.return_value = []
+
+    # Mock file_exists to return False for .circleci/config.yml (file doesn't exist)
+    file_handler.file_exists.return_value = False
+
+    # Call the method - should not raise any errors
+    application.remove_old_deployment_setup()
+
+    # Verify that .deployment folder is deleted
+    file_handler.delete_folder.assert_called_once_with(
+        Path(".deployment"), not_found_ok=True
+    )
+
+    # Verify that file_exists was called to check for .circleci/config.yml
+    file_handler.file_exists.assert_called_once_with(".circleci/config.yml")
+
+    # Verify that overwrite_file was NOT called since file doesn't exist
+    file_handler.overwrite_file.assert_not_called()
 
 
 def test_find_openapi_spec_returns_path_when_circleci_config_exists_with_spec(

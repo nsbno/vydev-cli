@@ -1070,20 +1070,22 @@ class DeploymentMigration:
             self.file_handler.delete_file(lock_file, not_found_ok=True)
 
         # Replace CircleCI config with no-op config instead of deleting
-        circleci_noop_config = (
-            "version: 2.1\n"
-            "\n"
-            "jobs:\n"
-            "  no_op:\n"
-            "    type: no-op\n"
-            "\n"
-            "workflows:\n"
-            "  no_op_workflow:\n"
-            "    jobs: [no_op]\n"
-        )
-        self.file_handler.overwrite_file(
-            Path(".circleci/config.yml"), circleci_noop_config
-        )
+        circleci_config_path = Path(".circleci/config.yml")
+        if self.file_handler.file_exists(str(circleci_config_path)):
+            circleci_noop_config = (
+                "version: 2.1\n"
+                "\n"
+                "jobs:\n"
+                "  no_op:\n"
+                "    type: no-op\n"
+                "\n"
+                "workflows:\n"
+                "  no_op_workflow:\n"
+                "    jobs: [no_op]\n"
+            )
+            self.file_handler.overwrite_file(
+                circleci_config_path, circleci_noop_config
+            )
 
     def commit_and_push_changes(self: Self, message: str) -> None:
         self.version_control.commit(message)
