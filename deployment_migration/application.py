@@ -1033,12 +1033,12 @@ class DeploymentMigration:
 
     def help_with_github_environment_setup(
         self, environment_folders: list[Path]
-    ) -> tuple[str, str, dict[str, str]]:
+    ) -> tuple[str, str, dict[str, str | None]]:
         """Gives help for GitHub environment setup
 
         Manual at the moment
 
-        :return: Link to the environment setup page and account IDs
+        :return: Link to the environment setup page and account IDs (None if not found)
         """
         account_ids = {}
 
@@ -1048,9 +1048,12 @@ class DeploymentMigration:
                 environment_folder_name = "production"
             environment_name = environment_folder_name.capitalize()
 
-            account_ids[environment_name] = self.terraform.find_account_id(
-                str(environment_folder)
-            )
+            try:
+                account_id = self.terraform.find_account_id(str(environment_folder))
+                account_ids[environment_name] = account_id
+            except (NotFoundError, Exception):
+                # Could not find account ID automatically, will prompt user later
+                account_ids[environment_name] = None
 
         repo_address = self.version_control.get_origin()
         new_env_url = f"https://{repo_address}/settings/environments/new"
