@@ -169,61 +169,14 @@ class CLIHandler:
         )
 
         self.terminal.hr_line()
-        self.terminal.update("Finding environment folders...")
+        self.terminal.update("Setting up GitHub Actions Environments...")
 
         environment_folders = self.deployment_migration.find_all_environment_folders()
-
-        # Get repository info
-        repo_address = self.deployment_migration.version_control.get_origin()
-        new_env_url = f"https://{repo_address}/settings/environments/new"
-
-        # Determine the parent folder from the found environment folders
-        parent_folder = None
-        if environment_folders:
-            parent_folder = environment_folders[0].parent
-
-        self.terminal.hr_line()
-
-        # Ask once for the base terraform environments folder
-        terraform_base_folder = self.queryier.ask_user_with_default_and_hint(
-            question="Where is the base folder containing your terraform environments?",
-            hint="This is typically `terraform/` or `environments/` (the parent folder containing test/, stage/, prod/, etc.)",
-            default_query=lambda: str(parent_folder) if parent_folder else None,
+        new_env_url, repo_address, accounts = (
+            self.deployment_migration.help_with_github_environment_setup(
+                environment_folders
+            )
         )
-
-        accounts = {}
-
-        # For each environment, try to extract account ID from the base folder
-        for environment_folder in environment_folders:
-            environment_folder_name = environment_folder.name
-            if environment_folder_name == "prod":
-                environment_folder_name = "production"
-            environment_name = environment_folder_name.capitalize()
-
-            # Construct path to environment folder under the user-specified base
-            terraform_env_folder = Path(terraform_base_folder) / environment_folder.name
-
-            # Try to find account ID from the specified folder
-            try:
-                account_id = self.deployment_migration.terraform.find_account_id(str(terraform_env_folder))
-                accounts[environment_name] = account_id
-                self.console.print(f"[green]✓ Found {environment_name} AWS Account ID: {account_id}[/green]")
-            except Exception:
-                # Only prompt for Service account if not found, skip others
-                if environment_name == "Service":
-                    self.terminal.hr_line()
-                    account_id = self.queryier.ask_user_with_default_and_hint(
-                        question=f"What is the AWS account ID for the {environment_name} environment?",
-                        hint=(
-                            "The account ID was not found in the terraform config.\n"
-                            "Check AWS console: https://vygruppen.awsapps.com/start"
-                        ),
-                        default_query=lambda: None,
-                    )
-                    accounts[environment_name] = account_id
-                else:
-                    self.console.print(
-                        f"[yellow]⚠ Could not find AWS Account ID for {environment_name} in {terraform_env_folder}[/yellow]")
 
         self.terminal.hr_line()
 
