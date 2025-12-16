@@ -172,6 +172,13 @@ class CLIHandler:
         self.terminal.update("Setting up GitHub Actions Environments...")
 
         environment_folders = self.deployment_migration.find_all_environment_folders()
+
+        if not environment_folders:
+            self.console.print("[red]Error: No environment folders found[/red]")
+            self.console.print("[yellow]Could not find environment folders like test/, stage/, prod/, service/ in common locations (terraform/, environments/)[/yellow]")
+            self.console.print("[yellow]Run the command in the correct directory.[/yellow]")
+            return
+
         new_env_url, repo_address, accounts = (
             self.deployment_migration.help_with_github_environment_setup(
                 environment_folders
