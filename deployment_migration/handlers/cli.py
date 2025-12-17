@@ -185,6 +185,17 @@ class CLIHandler:
             )
         )
 
+        if "Service" not in accounts or accounts["Service"] is None:
+            service_account_id = self.queryier.ask_user_with_default_and_hint(
+                question="What is the service account ID?",
+                hint=(
+                    "The account ID was not found in the terraform config.\n"
+                    "Check AWS console: https://vygruppen.awsapps.com/start"
+                ),
+                default_query=lambda: None,
+            )
+            accounts["Service"] = service_account_id
+
         self.terminal.hr_line()
 
         # Create environments using gh CLI or show manual instructions
