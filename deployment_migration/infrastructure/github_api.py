@@ -27,23 +27,16 @@ class GithubApiImplementation(GithubApi):
         else:
             print("Already authenticated.")
 
-    def environment_exists(self, repo, environment):
-        code, _, _ = self._run_cmd(f'gh api "repos/{repo}/environments/{environment}"')
-        return code == 0
-
     def create_environment(self: Self, repo: str, environment: str) -> None:
-        if self.environment_exists(repo, environment):
-            print(f"Environment '{environment}' already exists, skipping.")
-        else:
-            print(f"Creating environment: {environment} in repository: {repo}")
-            code, _, err = self._run_cmd(
-                f'gh api -X PUT "repos/{repo}/environments/{environment}"'
-            )
-            if code != 0:
-                if "409" in err:
-                    # No need to print anything, environment already exists
-                    return
-                print(f"Could not create environment '{environment}': {err}")
+        print(f"Creating environment: {environment} in repository: {repo}")
+        code, _, err = self._run_cmd(
+            f'gh api -X PUT "repos/{repo}/environments/{environment}"'
+        )
+        if code != 0:
+            if "409" in err:
+                # No need to print anything, environment already exists
+                return
+            print(f"Could not create environment '{environment}': {err}")
 
     def add_variable_to_environment(
         self: Self, repo: str, environment: str, name: str, value: str
