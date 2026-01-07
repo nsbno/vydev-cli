@@ -521,8 +521,8 @@ def main():
 
     console.print(
         Panel.fit(
-            "[bold blue]Deployment Migration[/bold blue]\n\n"
-            "Let's migrate to GitHub Actions 🚀"
+            "[bold blue]Vydev CLI[/bold blue]\n\n"
+            "GitHub Actions CI/CD 🚀"
         )
     )
 
