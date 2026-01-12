@@ -818,7 +818,7 @@ class DeploymentMigration:
             config = self.terraform.update_provider_versions(
                 config,
                 target_providers={
-                    "nsbno/vy": ">= 1.1.0, < 2.0.0",
+                    "vy": ">= 1.1.0, < 2.0.0",
                 },
             )
             self.file_handler.overwrite_file(provider_data["file"], config)
