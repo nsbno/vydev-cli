@@ -56,9 +56,12 @@ def test_upgrade_aws_repo_success(
     """Test successful AWS repo upgrade."""
     # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
     monkeypatch.setattr(
-        "deployment_migration.handlers.view.Prompt.ask", lambda *args, **kwargs: "terraform/test"
+        "deployment_migration.handlers.view.Prompt.ask",
+        lambda *args, **kwargs: "terraform/test",
     )
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
     # Mock the query cache to avoid cached values interfering
     monkeypatch.setattr(
         "deployment_migration.handlers.view.QueryCache.get",
@@ -93,7 +96,9 @@ def test_upgrade_aws_repo_error(
     monkeypatch.setattr(
         "rich.prompt.Prompt.ask", lambda *args, **kwargs: "terraform/test"
     )
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
 
     # Call the method and expect an exception
     with pytest.raises(Exception, match="Test error"):
@@ -128,7 +133,9 @@ def test_upgrade_application_repo_success(
     mock_deployment_migration.generate_deployment_workflow = mock.Mock()
 
     # Mock rich.prompt.Prompt.ask and rich.prompt.Confirm.ask directly
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
 
     def mock_prompt(*args, **kwargs):
         # Check for default parameter which rich.prompt uses
@@ -156,7 +163,7 @@ def test_upgrade_application_repo_success(
         str(terraform_folder)
     )
     mock_deployment_migration.upgrade_application_repo_terraform_provider_versions.assert_called_once()
-    mock_deployment_migration.replace_image_with_ecr_repository_url.assert_called_once()
+    mock_deployment_migration.replace_image_with_vy_ecs_image.assert_called_once()
     mock_deployment_migration.generate_deployment_workflow.assert_called_once()
     mock_deployment_migration.remove_old_deployment_setup.assert_called_once()
 
@@ -229,8 +236,12 @@ def test_upgrade_application_repo_folder_not_found(
             return False
         return True
 
-    monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask)
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask
+    )
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask
+    )
 
     # Call the method
     cli_handler.upgrade_application_repo()
@@ -408,7 +419,9 @@ def test_prepare_migration_generates_pr_workflows(
 
     monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt)
     monkeypatch.setattr("shutil.which", lambda x: True)  # gh CLI is available
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
 
     # Call the method
     cli_handler.prepare_migration()
@@ -500,8 +513,12 @@ def test_upgrade_application_repo_shows_branch_reminder(
         else:
             return str(terraform_folder)
 
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask)
-    monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask
+    )
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask
+    )
 
     # Call the method
     cli_handler.upgrade_application_repo()
@@ -544,8 +561,12 @@ def test_upgrade_application_repo_skips_environment_setup(
         else:
             return str(terraform_folder)
 
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask)
-    monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask
+    )
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask
+    )
 
     # Call the method
     cli_handler.upgrade_application_repo()
@@ -592,8 +613,12 @@ def test_upgrade_application_repo_generates_only_deployment_workflow(
         else:
             return str(terraform_folder)
 
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask)
-    monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask
+    )
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask
+    )
 
     # Call the method
     cli_handler.upgrade_application_repo()
@@ -637,8 +662,12 @@ def test_upgrade_application_repo_shows_git_instructions(
         else:
             return str(terraform_folder)
 
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask)
-    monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", mock_confirm_ask
+    )
+    monkeypatch.setattr(
+        "deployment_migration.handlers.view.Prompt.ask", mock_prompt_ask
+    )
 
     # Call the method
     cli_handler.upgrade_application_repo()
@@ -697,7 +726,9 @@ def test_prepare_migration_uses_gradle_and_ecs_without_prompting(
 
     monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt)
     monkeypatch.setattr("shutil.which", lambda x: True)
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
     # Mock the query cache to avoid cached values interfering
     monkeypatch.setattr(
         "deployment_migration.handlers.view.QueryCache.get",
@@ -755,7 +786,9 @@ def test_upgrade_application_repo_uses_gradle_and_ecs_without_prompting(
             return str(terraform_folder)
 
     monkeypatch.setattr("deployment_migration.handlers.view.Prompt.ask", mock_prompt)
-    monkeypatch.setattr("deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "deployment_migration.handlers.cli.Confirm.ask", lambda *args, **kwargs: True
+    )
     # Mock the query cache to avoid cached values interfering
     monkeypatch.setattr(
         "deployment_migration.handlers.view.QueryCache.get",

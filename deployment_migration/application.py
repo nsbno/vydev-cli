@@ -802,8 +802,8 @@ class DeploymentMigration:
             self.file_handler.overwrite_file(provider_data["file"], config)
 
     def upgrade_application_repo_vy_provider_versions(
-            self: Self,
-            folders: list[str],
+        self: Self,
+        folders: list[str],
     ):
         """Updates the Vy provider versions in the repo
 
@@ -823,11 +823,11 @@ class DeploymentMigration:
             )
             self.file_handler.overwrite_file(provider_data["file"], config)
 
-    def replace_image_with_ecr_repository_url(
+    def replace_image_with_vy_ecs_image(
         self: Self,
         terraform_infrastructure_folder: str,
-        repository_name: str,
-        service_account_id: str,
+        github_repository_name: str,
+        ecr_repository_name: str,
     ):
         # Find which file contains the ECS module instead of assuming main.tf
         ecs_module = self.terraform.find_module(
@@ -845,11 +845,11 @@ class DeploymentMigration:
 
         terraform_config = self.terraform.add_data_source(
             terraform_config,
-            "aws_ecr_repository",
+            "vy_ecs_image",
             name="this",
             variables={
-                "name": repository_name,
-                "registry_id": service_account_id,
+                "github_repository_name": github_repository_name,
+                "ecr_repository_name": ecr_repository_name,
             },
         )
 
@@ -1086,9 +1086,7 @@ class DeploymentMigration:
                 "  no_op_workflow:\n"
                 "    jobs: [no_op]\n"
             )
-            self.file_handler.overwrite_file(
-                circleci_config_path, circleci_noop_config
-            )
+            self.file_handler.overwrite_file(circleci_config_path, circleci_noop_config)
 
     def commit_and_push_changes(self: Self, message: str) -> None:
         self.version_control.commit(message)
@@ -1185,7 +1183,6 @@ class DeploymentMigration:
 
         new_content = existing_content + f"{cache_entry}\n"
         self.file_handler.overwrite_file(gitignore_path, new_content)
-
 
     def get_github_repository_name(self) -> str:
         """Get the GitHub repository name from the git origin URL"""

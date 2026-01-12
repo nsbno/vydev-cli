@@ -81,7 +81,9 @@ class RegexTerraformModifier(Terraform):
                 return match.group(0)  # Return unchanged if not ECS module
 
             # Replace image line with reference to ECR repository
-            new_variable = f"\n    image = data.vy_ecs_image.{vy_ecs_image_data_source_name}"
+            new_variable = (
+                f"\n    image = data.vy_ecs_image.{vy_ecs_image_data_source_name}"
+            )
             # Find and replace the image line
             image_pattern = r"\s+image\s*=\s*\"[^\"]*\""
             modified_content = re.sub(image_pattern, new_variable, module_content)

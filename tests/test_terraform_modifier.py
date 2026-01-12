@@ -700,9 +700,7 @@ def test_add_force_new_deployment_to_ecs_module(
 
     # Assert
     assert 'module "ecs_service"' in result
-    assert (
-        'source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"' in result
-    )
+    assert 'source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"' in result
     assert 'existing_var = "existing_value"' in result
     assert "force_new_deployment = true" in result
     assert "lb_listeners = [{" in result  # Ensure existing content is preserved

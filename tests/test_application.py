@@ -430,42 +430,44 @@ class TestAddECRRepository:
         )
 
     @pytest.fixture
-    def application_name(self: Self) -> str:
+    def github_repository_name(self: Self) -> str:
         return "test-app"
 
     @pytest.fixture
-    def service_account_id(self: Self) -> str:
-        return "23456789012"
+    def ecr_repository_name(self: Self) -> str:
+        return "petstore-repo"
 
-    def test_ecr_repository_data_source_is_added_when_not_present(
+    def test_vy_ecs_image_source_is_added_when_not_present(
         self: Self,
         application: DeploymentMigration,
         terraform_modifier: Terraform,
-        application_name: str,
-        service_account_id: str,
+        github_repository_name: str,
+        ecr_repository_name: str,
     ):
-        application.replace_image_with_ecr_repository_url(
-            "infrastructure", application_name, service_account_id
+        application.replace_image_with_vy_ecs_image(
+            terraform_infrastructure_folder="infrastructure",
+            github_repository_name=github_repository_name,
+            ecr_repository_name=ecr_repository_name,
         )
 
         call = terraform_modifier.add_data_source.mock_calls[0]
 
-        assert call.args[1] == "aws_ecr_repository"
+        assert call.args[1] == "vy_ecs_image"
         assert call.kwargs["name"] == "this"
         assert call.kwargs["variables"] == {
-            "name": application_name,
-            "registry_id": service_account_id,
+            "github_repository_name": github_repository_name,
+            "ecr_repository_name": ecr_repository_name,
         }
 
     def test_removes_vydev_artifact_reference(
         self: Self,
         application: DeploymentMigration,
         terraform_modifier: Terraform,
-        application_name: str,
-        service_account_id: str,
+        github_repository_name: str,
+        ecr_repository_name: str,
     ):
-        application.replace_image_with_ecr_repository_url(
-            "infrastructure", application_name, service_account_id
+        application.replace_image_with_vy_ecs_image(
+            "infrastructure", github_repository_name, ecr_repository_name
         )
 
         assert terraform_modifier.remove_vydev_artifact_reference.call_count == 1
@@ -474,11 +476,11 @@ class TestAddECRRepository:
         self: Self,
         application: DeploymentMigration,
         terraform_modifier: Terraform,
-        application_name: str,
-        service_account_id: str,
+        github_repository_name: str,
+        ecr_repository_name: str,
     ):
-        application.replace_image_with_ecr_repository_url(
-            "infrastructure", application_name, service_account_id
+        application.replace_image_with_vy_ecs_image(
+            "infrastructure", github_repository_name, ecr_repository_name
         )
 
         assert terraform_modifier.replace_image_tag_on_ecs_module.call_count == 1
@@ -797,7 +799,7 @@ def test_replace_image_with_ecr_when_ecs_in_separate_file(
         written_files.update({str(path): content})
     )
 
-    application.replace_image_with_ecr_repository_url(
+    application.replace_image_with_vy_ecs_image(
         "terraform/template", "my-repo", "123456789"
     )
 
@@ -843,8 +845,7 @@ def test_upgrade_terraform_application_adds_force_new_deployment(
         service_tf_content.replace("2.0.0", "3.0.0")
     )
     terraform_modifier.add_force_new_deployment_to_ecs_module.return_value = (
-        service_tf_content.replace("2.0.0", "3.0.0")
-        + "  force_new_deployment = true\n"
+        service_tf_content.replace("2.0.0", "3.0.0") + "  force_new_deployment = true\n"
     )
 
     application.upgrade_terraform_application_resources("terraform/template")
@@ -1031,7 +1032,6 @@ class TestServiceEnvironmentDetection:
         result = application.has_service_environment()
 
         assert result is True
-
 
     def test_deployment_workflow_omits_skip_flag_when_service_folder_exists(
         self,

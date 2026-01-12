@@ -48,9 +48,9 @@ class CLIHandler:
     """
 
     def __init__(
-            self,
-            deployment_migration: DeploymentMigration,
-            console: Console = None,
+        self,
+        deployment_migration: DeploymentMigration,
+        console: Console = None,
     ):
         """
         Initialize the CLI handler.
@@ -175,8 +175,12 @@ class CLIHandler:
 
         if not environment_folders:
             self.console.print("[red]Error: No environment folders found[/red]")
-            self.console.print("[yellow]Could not find environment folders like test/, stage/, prod/, service/ in common locations (terraform/, environments/)[/yellow]")
-            self.console.print("[yellow]Run the command in the correct directory.[/yellow]")
+            self.console.print(
+                "[yellow]Could not find environment folders like test/, stage/, prod/, service/ in common locations (terraform/, environments/)[/yellow]"
+            )
+            self.console.print(
+                "[yellow]Run the command in the correct directory.[/yellow]"
+            )
             return
 
         new_env_url, repo_address, accounts = (
@@ -221,9 +225,7 @@ class CLIHandler:
                     self.console.print(
                         "[bold red]Please complete the environment setup before continuing[/bold red]"
                     )
-            self.console.print(
-                "[green]GitHub environments setup complete![/green]"
-            )
+            self.console.print("[green]GitHub environments setup complete![/green]")
 
         self.terminal.hr_line()
         self.console.print("\n[bold green]✅ Environments Ready![/bold green]\n")
@@ -400,10 +402,10 @@ class CLIHandler:
         self.deployment_migration.upgrade_terraform_application_resources(
             str(terraform_folder)
         )
-        self.deployment_migration.replace_image_with_ecr_repository_url(
-            str(terraform_folder),
-            repository_name,
-            github_repository_name,
+        self.deployment_migration.replace_image_with_vy_ecs_image(
+            terraform_infrastructure_folder=str(terraform_folder),
+            ecr_repository_name=repository_name,
+            github_repository_name=github_repository_name,
         )
         self.console.print(
             "[green]Application terraform resources upgraded successfully![/green]"
@@ -520,10 +522,7 @@ def main():
     deployment_migration.ensure_cache_in_gitignore()
 
     console.print(
-        Panel.fit(
-            "[bold blue]Vydev CLI[/bold blue]\n\n"
-            "GitHub Actions CI/CD 🚀"
-        )
+        Panel.fit("[bold blue]Vydev CLI[/bold blue]\n\n" "GitHub Actions CI/CD 🚀")
     )
 
     # Create an instance of CLIHandler
