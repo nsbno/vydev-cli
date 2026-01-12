@@ -1195,12 +1195,13 @@ class DeploymentMigration:
             # Run git status --porcelain to check for uncommitted changes
             # If the output is empty, the repository is in a clean state
             result = subprocess.run(
-                ["basename", "-s", ".git", "`git", "config", "--get", "remote.origin.url`"],
+                ["git", "config", "--get", "remote.origin.url"],
                 check=True,
                 capture_output=True,
                 text=True,
             )
-            return result.stdout.strip()
+            origin_url = result.stdout.strip()
+            return origin_url.split("/")[-1].replace(".git", "")
         except subprocess.CalledProcessError as e:
             # Handle git command errors
             raise RuntimeError(f"Git operation failed: {e}")
