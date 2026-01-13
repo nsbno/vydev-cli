@@ -436,16 +436,11 @@ class CLIHandler:
         self.console.print(f"\nThe following files have changes: {changed_files}")
 
         self.terminal.hr_line()
-        self.console.print("\n[bold green]✅ Migration Complete![/bold green]\n")
+        self.console.print("\n[bold green]✅ Command Complete![/bold green]\n")
         self.console.print("[bold]Next Steps:[/bold]\n")
         self.console.print("1. Review the changes in your working directory")
-        self.console.print("2. Commit the changes:")
-        self.console.print("   [cyan]git add .[/cyan]")
-        self.console.print(
-            "   [cyan]git commit -m 'Upgrade to GitHub Actions deployment'[/cyan]\n"
-        )
-        self.console.print("3. Push to remote:")
-        self.console.print("   [cyan]git push[/cyan]\n")
+        self.console.print("2. Compare changes to the Confluence table of changes (if applicable)")
+        self.console.print("3. Follow the rest of the steps in the guide you are using 🚀")
 
 
 def main():
