@@ -85,7 +85,8 @@ class RegexTerraformModifier(Terraform):
                 f"\n    image = data.vy_ecs_image.{vy_ecs_image_data_source_name}"
             )
             # Find and replace the image line
-            image_pattern = r"\s+image\s*=\s*\"[^\"]*\""
+            # Pattern matches both quoted strings and unquoted references (local.x, var.x, etc.)
+            image_pattern = r"\s+image\s*=\s*(?:\"[^\"]*\"|[^\s\n]+)"
             modified_content = re.sub(image_pattern, new_variable, module_content)
 
             return f'module "{module_name}" {{{modified_content}}}'
@@ -102,20 +103,35 @@ class RegexTerraformModifier(Terraform):
         :param terraform_folder: The folder path containing Terraform files
         :return: Dictionary with provider details if found, None otherwise
         """
-        # Create a pattern to match required_providers blocks and capture provider details
-        provider_pattern = (
-            rf"required_providers\s+{{\s*[^}}]*{target_provider}\s*=\s*{{\s*([^}}]*)}}"
-        )
+        # Pattern to find the target provider block within required_providers
+        # This matches: provider_name = { ... }
+        provider_pattern = rf"{target_provider}\s*=\s*{{"
 
         # Read all .tf files from the terraform folder
         tf_files = terraform_folder.glob("**/*.tf")
         for tf_file in tf_files:
             with open(tf_file, "r") as f:
                 content = f.read()
-                # Search for the pattern in the terraform config
-                match = re.search(provider_pattern, content, re.DOTALL)
+                match = re.search(provider_pattern, content)
                 if match:
-                    provider_block = match.group(1)
+                    start_pos = match.end() - 1  # Position of opening '{'
+                    bracket_count = 0
+                    end_pos = -1
+
+                    for i in range(start_pos, len(content)):
+                        if content[i] == "{":
+                            bracket_count += 1
+                        elif content[i] == "}":
+                            bracket_count -= 1
+                            if bracket_count == 0:
+                                end_pos = i
+                                break
+
+                    if end_pos == -1:
+                        continue  # Couldn't find matching bracket
+
+                    # Extract the provider block content
+                    provider_block = content[start_pos + 1 : end_pos]
 
                     # Extract version from the provider block
                     version_match = re.search(
@@ -149,30 +165,52 @@ class RegexTerraformModifier(Terraform):
         :return: The modified Terraform configuration with updated provider versions
         """
         modified_config = terraform_config
-        # Create pattern to match required_providers blocks
-        provider_block_pattern = r"required_providers\s+{[^}]*}"
+        # Pattern to find required_providers block start
+        provider_block_start_pattern = r"required_providers\s+{"
 
         # Check if required_providers block exists
-        required_providers_block = re.search(provider_block_pattern, modified_config)
+        required_providers_match = re.search(provider_block_start_pattern, modified_config)
 
-        if required_providers_block:
-            # If block exists, update provider versions within it
-            block_text = required_providers_block.group(0)
-            for provider_name, new_version in target_providers.items():
-                # Match provider configuration within required_providers block
-                provider_pattern = f'({provider_name}\\s*=\\s*{{[^}}]*version\\s*=\\s*)"[^"]*"([^}}]*}})'
+        if required_providers_match:
+            start_pos = required_providers_match.end() - 1  # Position of opening '{'
+            bracket_count = 0
+            end_pos = -1
 
-                # Update version while preserving formatting
-                updated_block = re.sub(
-                    provider_pattern, f'\\1"{new_version}"\\2', block_text
-                )
+            for i in range(start_pos, len(modified_config)):
+                if modified_config[i] == "{":
+                    bracket_count += 1
+                elif modified_config[i] == "}":
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        end_pos = i
+                        break
 
-                block_text = updated_block
+            if end_pos != -1:
+                # Extract the full required_providers block including the braces
+                block_start = required_providers_match.start()
+                full_block = modified_config[block_start : end_pos + 1]
+                block_text = full_block
 
-            # Replace old block with updated one
-            modified_config = modified_config.replace(
-                required_providers_block.group(0), block_text
-            )
+                # Update each provider version within the block
+                for provider_name, new_version in target_providers.items():
+                    # Match provider configuration and update version
+                    # Pattern: provider_name = { ... version = "old_version" ... }
+                    # Use non-greedy match with DOTALL to handle nested braces
+                    provider_pattern = f'({provider_name}\\s*=\\s*{{.*?version\\s*=\\s*)"[^"]*"'
+
+                    # Update version while preserving formatting
+                    updated_block = re.sub(
+                        provider_pattern, f'\\1"{new_version}"', block_text, flags=re.DOTALL
+                    )
+
+                    block_text = updated_block
+
+                # Replace old block with updated one
+                modified_config = modified_config.replace(full_block, block_text)
+            else:
+                # If we couldn't find the closing brace, fall back to the old behavior
+                # (This shouldn't happen with valid Terraform config)
+                pass
         else:
             # If no required_providers block exists, create one
             providers_text = "terraform {\n  required_providers {\n"

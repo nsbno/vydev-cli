@@ -441,6 +441,78 @@ def test_update_provider_versions_replaces_existing_version(
     assert len(result.splitlines()) == len(terraform_config.splitlines())
 
 
+def test_update_provider_versions_with_multiple_providers(
+    terraform_modifier: RegexTerraformModifier,
+) -> None:
+    """Test that update_provider_versions works with multiple providers in required_providers block."""
+    # Arrange - this reproduces the bug where vy provider wasn't being updated
+    terraform_config = """
+    terraform {
+      required_version = "1.5.3"
+
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = ">= 6.15.0, < 7.0.0"
+        }
+        vy = {
+          source  = "nsbno/vy"
+          version = "0.3.1"
+        }
+      }
+    }
+    """
+
+    target_providers = {"vy": ">= 1.1.0, < 2.0.0"}
+
+    # Act
+    result = terraform_modifier.update_provider_versions(
+        terraform_config, target_providers
+    )
+
+    # Assert - vy provider should be updated
+    assert 'version = ">= 1.1.0, < 2.0.0"' in result
+    assert 'version = "0.3.1"' not in result
+    # AWS provider should remain unchanged
+    assert 'version = ">= 6.15.0, < 7.0.0"' in result
+
+
+def test_find_provider_with_multiple_providers(
+    terraform_modifier: RegexTerraformModifier, tmp_path: Path
+) -> None:
+    """Test that find_provider works when multiple providers exist in required_providers block."""
+    # Arrange - config with multiple providers
+    terraform_config = """
+    terraform {
+      required_version = "1.5.3"
+
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = ">= 6.15.0, < 7.0.0"
+        }
+        vy = {
+          source  = "nsbno/vy"
+          version = "0.3.1"
+        }
+      }
+    }
+    """
+
+    tf_file = tmp_path / "main.tf"
+    tf_file.write_text(terraform_config)
+
+    # Act - find the vy provider (which comes after aws in the block)
+    result = terraform_modifier.find_provider("vy", tmp_path)
+
+    # Assert
+    assert result is not None
+    assert result["name"] == "vy"
+    assert result["version"] == "0.3.1"
+    assert result["source"] == "nsbno/vy"
+    assert result["file"] == tf_file
+
+
 def test_add_data_source_adds_datasource(terraform_modifier: Terraform) -> None:
     terraform_config = "// A random comment\n"
 
@@ -485,6 +557,41 @@ def test_replace_image_tag_on_ecs_module(terraform_modifier: Terraform) -> None:
         '  existing_var = "existing_value"\n'
         "    image = data.vy_ecs_image.this\n"
         '  another_existing_var = "existing_value"\n'
+        "}"
+    )
+
+    assert result == expected_config
+
+
+def test_replace_image_tag_on_ecs_module_with_unquoted_local_reference(
+    terraform_modifier: Terraform,
+) -> None:
+    """Test that image replacement works with unquoted local references like local.task_container_image."""
+    terraform_config = (
+        'module "service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"\n'
+        "  application_container = {\n"
+        '    name     = "main"\n'
+        "    image    = local.task_container_image\n"
+        "    port     = 8080\n"
+        '    protocol = "HTTP"\n'
+        "  }\n"
+        "}"
+    )
+
+    result = terraform_modifier.replace_image_tag_on_ecs_module(
+        terraform_config, "this"
+    )
+
+    expected_config = (
+        'module "service" {\n'
+        '  source = "github.com/nsbno/terraform-aws-ecs-service?ref=3.0.0"\n'
+        "  application_container = {\n"
+        '    name     = "main"\n'
+        "    image = data.vy_ecs_image.this\n"
+        "    port     = 8080\n"
+        '    protocol = "HTTP"\n'
+        "  }\n"
         "}"
     )
 
