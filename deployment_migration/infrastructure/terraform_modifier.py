@@ -6,7 +6,7 @@ from deployment_migration.application import Terraform, NotFoundError
 
 
 class RegexTerraformModifier(Terraform):
-    """Implementation of TerraformModifyer that uses regex to modify Terraform files."""
+    """Implementation of TerraformModifier that uses regex to modify Terraform files."""
 
     def remove_vydev_artifact_reference(
         self: Self,

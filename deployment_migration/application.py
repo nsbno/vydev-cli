@@ -8,6 +8,7 @@ from typing import Self, Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
+_TERRAFORM_AWS_GITHUB_OIDC_EXPECTED_VERSION = "1.0.0"
 
 # Teams that require custom AWS role name for GitHub Actions
 CUSTOM_AWS_ROLE_PREFIXES = [
@@ -696,21 +697,23 @@ class DeploymentMigration:
             "service" if "service" in terraform_folder else "var.environment"
         )
 
+        _GITHUB_OIDC_MODULE_SOURCE = "github.com/nsbno/terraform-aws-github-oidc"
+
         if self.terraform.has_module(
-            "github.com/nsbno/terraform-aws-github-oidc", Path(terraform_folder)
+            _GITHUB_OIDC_MODULE_SOURCE, Path(terraform_folder)
         ):
             updated_config = self.terraform.update_module_versions(
                 terraform_config,
                 target_modules={
-                    "github.com/nsbno/terraform-aws-github-oidc": "0.1.0",
+                    _GITHUB_OIDC_MODULE_SOURCE: _TERRAFORM_AWS_GITHUB_OIDC_EXPECTED_VERSION,
                 },
             )
         else:
             updated_config = self.terraform.add_module(
                 terraform_config,
                 name="github_actions_oidc",
-                source="github.com/nsbno/terraform-aws-github-oidc",
-                version="0.1.0",
+                source=_GITHUB_OIDC_MODULE_SOURCE,
+                version=_TERRAFORM_AWS_GITHUB_OIDC_EXPECTED_VERSION,
                 variables={"environment": environment_variable},
             )
 
@@ -726,13 +729,13 @@ class DeploymentMigration:
             infrastructure_folder,
         )
 
-        terraform_config = self.file_handler.read_file(loadbalancer_module["file_path"])
-
         if not loadbalancer_module:
             raise NotFoundError(
                 "You are not using the shared loadbalancer module.\n"
                 "Please migrate to using the following module manually https://github.com/nsbno/terraform-aws-loadbalancer"
             )
+
+        terraform_config = self.file_handler.read_file(loadbalancer_module["file_path"])
 
         updated_config = self.terraform.update_module_versions(
             terraform_config,
