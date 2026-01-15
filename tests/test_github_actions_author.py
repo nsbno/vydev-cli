@@ -139,11 +139,11 @@ def test_create_deployment_workflow_includes_open_api_upload_if_present(
 
     workflow_dict = yaml.safe_load(result)
 
-    assert "upload-openapi-spec" in workflow_dict["jobs"]
-    assert "build" in workflow_dict["jobs"]["upload-openapi-spec"]["needs"]
-    assert "inherit" in workflow_dict["jobs"]["upload-openapi-spec"]["secrets"]
+    assert "upload-open-api-spec" in workflow_dict["jobs"]
+    assert "build" in workflow_dict["jobs"]["upload-open-api-spec"]["needs"]
+    assert "inherit" in workflow_dict["jobs"]["upload-open-api-spec"]["secrets"]
 
     assert (
         openapi_yaml
-        in workflow_dict["jobs"]["upload-openapi-spec"]["with"]["open-api-spec-path"]
+        in workflow_dict["jobs"]["upload-open-api-spec"]["with"]["open-api-spec-path"]
     )

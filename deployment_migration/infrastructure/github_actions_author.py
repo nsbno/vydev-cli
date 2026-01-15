@@ -141,8 +141,8 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
         open_api_spec_path: str,
     ) -> dict[str, Any]:
         return {
-            "upload-openapi-spec": {
-                "uses": self._workflow("helpers", "upload-openapi-spec", "v2"),
+            "upload-open-api-spec": {
+                "uses": self._workflow("helpers", "upload-open-api-spec", "v2"),
                 "needs": ["build"],
                 "secrets": "inherit",
                 "with": {
