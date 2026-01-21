@@ -171,13 +171,11 @@ def test_upgrade_application_repo_success(
     mock_deployment_migration.initialize_github_environments.assert_not_called()
     mock_deployment_migration.help_with_github_environment_setup.assert_not_called()
 
-    # Verify console output includes new git instructions
+    # Verify console output includes completion message
     output = string_io.getvalue()
     assert "Upgrade Application Repo" in output
-    assert "Migration Complete" in output
-    assert "git add ." in output
-    assert "git commit -m" in output
-    assert "git push" in output
+    assert "Command Complete!" in output
+    assert "Next Steps" in output
 
 
 def test_upgrade_application_repo_folder_not_found(
@@ -526,7 +524,7 @@ def test_upgrade_application_repo_shows_branch_reminder(
     # Verify console output
     output = string_io.getvalue()
     assert "Upgrade Application Repo" in output
-    assert "Migration Complete" in output
+    assert "Command Complete!" in output
 
 
 def test_upgrade_application_repo_skips_environment_setup(
@@ -628,10 +626,10 @@ def test_upgrade_application_repo_generates_only_deployment_workflow(
     mock_deployment_migration.generate_pr_workflows.assert_not_called()
 
 
-def test_upgrade_application_repo_shows_git_instructions(
+def test_upgrade_application_repo_shows_next_steps(
     cli_handler, mock_deployment_migration, string_io, monkeypatch
 ):
-    """Should show manual git instructions at the end."""
+    """Should show next steps at the end."""
     # Mock user inputs and deployment_migration methods
     terraform_folder = Path("terraform/template")
     mock_deployment_migration.find_terraform_infrastructure_folder.return_value = (
@@ -672,13 +670,12 @@ def test_upgrade_application_repo_shows_git_instructions(
     # Call the method
     cli_handler.upgrade_application_repo()
 
-    # Verify git instructions in output
+    # Verify next steps in output
     output = string_io.getvalue()
-    assert "Migration Complete" in output
+    assert "Command Complete!" in output
     assert "Next Steps" in output
-    assert "git add ." in output
-    assert "git commit -m" in output
-    assert "git push" in output
+    assert "Review the changes in your working directory" in output
+    assert "Follow the rest of the steps in the guide you are using" in output
 
 
 def test_prepare_migration_uses_gradle_and_ecs_without_prompting(
