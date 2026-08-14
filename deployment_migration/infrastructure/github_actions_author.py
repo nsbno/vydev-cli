@@ -212,7 +212,7 @@ class YAMLGithubActionsAuthor(GithubActionsAuthor):
             "needs": [name for name in jobs.keys()],
             "uses": self._workflow("deployment", "all-environments-ecs", "v2"),
             "secrets": "inherit",
-            "if": "!cancelled() && !contains(needs.*.results, 'failure') && success()",
+            "if": "!cancelled() && !contains(needs.*.result, 'failure') && success()",
             "with": deploy_with,
         }
 
